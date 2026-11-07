@@ -1,0 +1,6 @@
+{
+  "name": "Matrix Player",
+  "description": "Premium native Android offline media player with Super Crystal Liquid Glass UI, equalizer, visualizer studio, and comprehensive media playback.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

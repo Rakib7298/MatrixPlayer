@@ -1,0 +1,23 @@
+package com.example.ui.navigation
+
+sealed class Screen(val route: String, val title: String) {
+    object Splash : Screen("splash", "Splash")
+    object Home : Screen("home", "Home")
+    object MusicLibrary : Screen("music_library", "Music")
+    object Albums : Screen("albums", "Albums")
+    object Artists : Screen("artists", "Artists")
+    object Folders : Screen("folders", "Folders")
+    object Playlists : Screen("playlists", "Playlists")
+    object FullScreenMusicPlayer : Screen("full_player", "Player")
+    object VisualizerStudio : Screen("visualizer_studio", "Visualizer")
+    object EqStudio : Screen("eq_studio", "Equalizer")
+    object VideoLibrary : Screen("video_library", "Videos")
+    object FullScreenVideoPlayer : Screen("full_video_player", "Video Player")
+    object SubtitleManager : Screen("subtitles", "Subtitles")
+    object StreamingSources : Screen("streaming", "Streams")
+    object PlaybackHistory : Screen("history", "History")
+    object Favorites : Screen("favorites", "Favorites")
+    object Settings : Screen("settings", "Settings")
+    object About : Screen("about", "About")
+    object GitHubPlaylists : Screen("github_playlists", "GitHub Playlists")
+}
