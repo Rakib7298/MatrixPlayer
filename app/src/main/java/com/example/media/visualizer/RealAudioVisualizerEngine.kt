@@ -1,8 +1,11 @@
 package com.example.media.visualizer
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.media.audiofx.Visualizer
 import android.util.Log
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -47,14 +50,29 @@ class RealAudioVisualizerEngine(private val context: Context) {
     val reactiveFrame: StateFlow<AudioReactiveFrame> = _reactiveFrame.asStateFlow()
 
     fun attachAudioSession(audioSessionId: Int) {
-        if (audioSessionId == 0 || audioSessionId == currentSessionId) return
+        if (audioSessionId <= 0 || audioSessionId == currentSessionId) return
         release()
         currentSessionId = audioSessionId
+
+        // Check runtime RECORD_AUDIO permission before instantiating hardware Visualizer
+        val hasPermission = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (!hasPermission) {
+            Log.i("AudioVisualizerEngine", "RECORD_AUDIO permission not granted. Falling back to synthetic visualizer.")
+            _reactiveFrame.value = _reactiveFrame.value.copy(isHardwareDriven = false)
+            return
+        }
 
         try {
             val vis = Visualizer(audioSessionId)
             val captureRate = Visualizer.getMaxCaptureRate()
-            val captureSize = 128.coerceAtMost(Visualizer.getCaptureSizeRange()[1])
+            val ranges = Visualizer.getCaptureSizeRange()
+            val captureSize = if (ranges != null && ranges.size >= 2) {
+                128.coerceAtMost(ranges[1])
+            } else 128
             vis.captureSize = captureSize
 
             vis.setDataCaptureListener(
@@ -86,8 +104,14 @@ class RealAudioVisualizerEngine(private val context: Context) {
 
             vis.enabled = true
             visualizer = vis
-        } catch (e: Exception) {
-            Log.w("AudioVisualizerEngine", "Hardware visualizer init: ${e.message}. Using synthetic audio processor.")
+            _reactiveFrame.value = _reactiveFrame.value.copy(isHardwareDriven = true)
+        } catch (t: Throwable) {
+            Log.w("AudioVisualizerEngine", "Hardware visualizer init: ${t.message}. Using synthetic audio processor.")
+            try {
+                visualizer?.release()
+            } catch (_: Throwable) {}
+            visualizer = null
+            _reactiveFrame.value = _reactiveFrame.value.copy(isHardwareDriven = false)
         }
     }
 

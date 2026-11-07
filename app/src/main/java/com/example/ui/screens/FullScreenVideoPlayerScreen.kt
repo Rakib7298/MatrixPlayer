@@ -138,9 +138,18 @@ fun FullScreenVideoPlayerScreen(
     var showControls by remember { mutableStateOf(true) }
     var userInteracting by remember { mutableStateOf(false) }
 
-    // Gesture State: HUD indicators
+    // Gesture State: HUD indicators & Drag directions
     var hudBrightnessVisible by remember { mutableStateOf(false) }
     var hudVolumeVisible by remember { mutableStateOf(false) }
+    var hudSeekVisible by remember { mutableStateOf(false) }
+    var hudSeekDeltaMs by remember { mutableLongStateOf(0L) }
+    var hudSeekTargetMs by remember { mutableLongStateOf(0L) }
+
+    var activeGestureDirection by remember { mutableStateOf<String?>(null) } // "SEEK", "BRIGHTNESS", "VOLUME"
+    var totalDragX by remember { mutableFloatStateOf(0f) }
+    var totalDragY by remember { mutableFloatStateOf(0f) }
+    var dragStartPosMs by remember { mutableLongStateOf(0L) }
+
     var seekBubbleText by remember { mutableStateOf<String?>(null) }
     var seekBubbleForward by remember { mutableStateOf(true) }
 
@@ -172,6 +181,12 @@ fun FullScreenVideoPlayerScreen(
         if (hudVolumeVisible) {
             delay(1500)
             hudVolumeVisible = false
+        }
+    }
+    LaunchedEffect(hudSeekVisible, userInteracting) {
+        if (hudSeekVisible && !userInteracting) {
+            delay(1200)
+            hudSeekVisible = false
         }
     }
     LaunchedEffect(seekBubbleText) {
@@ -340,25 +355,69 @@ fun FullScreenVideoPlayerScreen(
                         }
                     )
                 }
-                .pointerInput(videoState.isLocked) {
+                .pointerInput(videoState.isLocked, durationMs) {
                     if (videoState.isLocked) return@pointerInput
                     detectDragGestures(
-                        onDragStart = { userInteracting = true },
-                        onDragEnd = { userInteracting = false },
-                        onDragCancel = { userInteracting = false },
+                        onDragStart = { offset ->
+                            userInteracting = true
+                            activeGestureDirection = null
+                            totalDragX = 0f
+                            totalDragY = 0f
+                            dragStartPosMs = videoState.currentPositionMs
+                        },
+                        onDragEnd = {
+                            userInteracting = false
+                            if (activeGestureDirection == "SEEK" && hudSeekVisible) {
+                                videoEngine.seekTo(hudSeekTargetMs)
+                            }
+                            activeGestureDirection = null
+                        },
+                        onDragCancel = {
+                            userInteracting = false
+                            if (activeGestureDirection == "SEEK" && hudSeekVisible) {
+                                videoEngine.seekTo(hudSeekTargetMs)
+                            }
+                            activeGestureDirection = null
+                        },
                         onDrag = { change, dragAmount ->
-                            val x = change.position.x
-                            val deltaY = dragAmount.y
-                            if (x < size.width / 2) {
-                                // Left half: Brightness drag (moving up decreases Y, which increases brightness)
-                                val delta = -deltaY / 300f
-                                videoEngine.adjustBrightnessDelta(activity, delta)
-                                hudBrightnessVisible = true
-                            } else {
-                                // Right half: Volume drag
-                                val delta = -deltaY / 300f
-                                videoEngine.adjustVolumeDelta(delta)
-                                hudVolumeVisible = true
+                            totalDragX += dragAmount.x
+                            totalDragY += dragAmount.y
+
+                            if (activeGestureDirection == null) {
+                                val absX = kotlin.math.abs(totalDragX)
+                                val absY = kotlin.math.abs(totalDragY)
+                                val threshold = 10f
+
+                                if (absX > threshold || absY > threshold) {
+                                    if (absX > absY) {
+                                        activeGestureDirection = "SEEK"
+                                    } else {
+                                        val touchX = change.position.x
+                                        val screenMid = size.width / 2f
+                                        activeGestureDirection = if (touchX < screenMid) "BRIGHTNESS" else "VOLUME"
+                                    }
+                                }
+                            }
+
+                            when (activeGestureDirection) {
+                                "SEEK" -> {
+                                    val fullWidthMs = 120_000L // 2 minutes seeking window across full screen
+                                    val deltaMs = (totalDragX / size.width.toFloat() * fullWidthMs).toLong()
+                                    val targetMs = (dragStartPosMs + deltaMs).coerceIn(0L, durationMs.coerceAtLeast(1000L))
+                                    hudSeekTargetMs = targetMs
+                                    hudSeekDeltaMs = targetMs - dragStartPosMs
+                                    hudSeekVisible = true
+                                }
+                                "BRIGHTNESS" -> {
+                                    val delta = -dragAmount.y / 300f
+                                    videoEngine.adjustBrightnessDelta(activity, delta)
+                                    hudBrightnessVisible = true
+                                }
+                                "VOLUME" -> {
+                                    val delta = -dragAmount.y / 300f
+                                    videoEngine.adjustVolumeDelta(delta)
+                                    hudVolumeVisible = true
+                                }
                             }
                         }
                     )
@@ -395,6 +454,74 @@ fun FullScreenVideoPlayerScreen(
                             color = Color.White,
                             fontWeight = FontWeight.Bold,
                             fontSize = 13.sp
+                        )
+                    }
+                }
+            }
+        }
+
+        // Center HUD: Horizontal Drag Seek Capsule
+        AnimatedVisibility(
+            visible = hudSeekVisible,
+            enter = fadeIn() + scaleIn(),
+            exit = fadeOut() + scaleOut(),
+            modifier = Modifier.align(Alignment.Center)
+        ) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(Color(0xD90B101D))
+                    .border(1.5.dp, Brush.horizontalGradient(listOf(RefBlueCyanGlow, RefPurpleLight)), RoundedCornerShape(24.dp))
+                    .padding(horizontal = 24.dp, vertical = 16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (hudSeekDeltaMs >= 0) Icons.Default.FastForward else Icons.Default.FastRewind,
+                            contentDescription = null,
+                            tint = RefBlueCyanGlow,
+                            modifier = Modifier.size(28.dp)
+                        )
+                        Text(
+                            text = "${if (hudSeekDeltaMs >= 0) "+" else ""}${hudSeekDeltaMs / 1000}s",
+                            color = Color.White,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                    }
+
+                    val targetMin = hudSeekTargetMs / 60000
+                    val targetSec = (hudSeekTargetMs % 60000) / 1000
+                    val targetStr = String.format("%02d:%02d", targetMin, targetSec)
+
+                    Text(
+                        text = "$targetStr / $durationTimeString",
+                        color = Color(0xFF94A3B8),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    // Target progress bar indicator
+                    val targetRatio = if (durationMs > 0) (hudSeekTargetMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f) else 0f
+                    Box(
+                        modifier = Modifier
+                            .width(160.dp)
+                            .height(4.dp)
+                            .clip(CircleShape)
+                            .background(Color(0x40FFFFFF))
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .fillMaxWidth(targetRatio)
+                                .background(Brush.horizontalGradient(listOf(RefBlueCyanGlow, RefPurpleLight)))
                         )
                     }
                 }

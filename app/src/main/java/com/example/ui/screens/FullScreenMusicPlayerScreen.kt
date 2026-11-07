@@ -65,7 +65,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.media.visualizer.AudioReactiveFrame
 import com.example.ui.components.CrystalGlassCard
+import com.example.ui.components.GlassVisualizerMode
+import com.example.ui.components.RealtimeGlassVisualizer
 import com.example.ui.navigation.Screen
 import com.example.ui.theme.LocalMatrixColors
 import com.example.ui.theme.RefBlueCyanGlow
@@ -84,6 +87,7 @@ import kotlin.math.sin
 @Composable
 fun FullScreenMusicPlayerScreen(
     uiState: PlayerUiState,
+    reactiveFrame: AudioReactiveFrame = AudioReactiveFrame(),
     onPlayPause: () -> Unit,
     onNext: () -> Unit,
     onPrevious: () -> Unit,
@@ -361,40 +365,14 @@ fun FullScreenMusicPlayerScreen(
             }
         }
 
-        // Realistic Audio Waveform Bars (Exact Match to Reference 1)
-        Canvas(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(34.dp)
-                .padding(horizontal = 4.dp)
-        ) {
-            val barCount = 52
-            val spacing = size.width / barCount
-            val barWidth = spacing * 0.5f
-
-            // Waveform height profile matching Reference 1
-            for (i in 0 until barCount) {
-                val factor = when {
-                    i in 16..34 -> 0.4f + 0.6f * sin(((i - 16).toFloat() / 18f) * Math.PI.toFloat())
-                    i in 8..15 -> 0.2f + 0.3f * sin(((i - 8).toFloat() / 8f) * Math.PI.toFloat())
-                    i in 35..44 -> 0.2f + 0.35f * sin(((i - 35).toFloat() / 10f) * Math.PI.toFloat())
-                    else -> 0.15f
-                }
-                val barHeight = size.height * factor
-                val x = i * spacing + barWidth / 2
-                val y = (size.height - barHeight) / 2
-
-                val isPlayed = (i.toFloat() / barCount) <= progress
-                val color = if (isPlayed) RefPurpleLight else RefSliderTrack
-
-                drawRoundRect(
-                    color = color,
-                    topLeft = Offset(x, y),
-                    size = Size(barWidth, barHeight),
-                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(barWidth / 2, barWidth / 2)
-                )
-            }
-        }
+        // Real-time Dynamic Glass Visualizer Waveform Studio
+        RealtimeGlassVisualizer(
+            reactiveFrame = reactiveFrame,
+            isPlaying = uiState.isPlaying,
+            mode = GlassVisualizerMode.DYNAMIC_FREQUENCY_BARS,
+            heightDp = 38.dp,
+            modifier = Modifier.padding(horizontal = 4.dp)
+        )
 
         // Horizontal Purple Slider with Glowing Circular Handle & Timestamps
         Column(modifier = Modifier.fillMaxWidth()) {

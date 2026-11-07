@@ -30,7 +30,7 @@ class AndroidAudioEffectManager(private val context: Context) {
         private set
 
     fun attachAudioSession(audioSessionId: Int) {
-        if (audioSessionId == 0 || audioSessionId == currentSessionId) return
+        if (audioSessionId <= 0 || audioSessionId == currentSessionId) return
         release()
         currentSessionId = audioSessionId
 
@@ -65,8 +65,8 @@ class AndroidAudioEffectManager(private val context: Context) {
                     bassBoost = bb
                     bbSupported = true
                 }
-            } catch (e: Exception) {
-                Log.w("AudioEffectManager", "BassBoost not supported: ${e.message}")
+            } catch (t: Throwable) {
+                Log.w("AudioEffectManager", "BassBoost not supported: ${t.message}")
             }
 
             capabilities = AudioEffectCapabilities(
@@ -78,8 +78,12 @@ class AndroidAudioEffectManager(private val context: Context) {
                 centerFrequenciesHz = freqs,
                 presetNames = presets
             )
-        } catch (e: Exception) {
-            Log.w("AudioEffectManager", "Equalizer hardware session unavailable: ${e.message}")
+        } catch (t: Throwable) {
+            Log.w("AudioEffectManager", "Equalizer hardware session unavailable: ${t.message}")
+            try {
+                equalizer?.release()
+            } catch (_: Throwable) {}
+            equalizer = null
             capabilities = AudioEffectCapabilities(
                 isEqualizerSupported = false,
                 isBassBoostSupported = false,

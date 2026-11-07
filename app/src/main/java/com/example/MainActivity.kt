@@ -29,6 +29,7 @@ import com.example.ui.components.MatrixBackground
 import com.example.ui.components.MatrixBottomNavBar
 import com.example.ui.navigation.Screen
 import com.example.ui.screens.AboutScreen
+import com.example.ui.screens.AiChatScreen
 import com.example.ui.screens.AlbumsScreen
 import com.example.ui.screens.ArtistsScreen
 import com.example.ui.screens.EqStudioScreen
@@ -38,6 +39,7 @@ import com.example.ui.screens.FullScreenMusicPlayerScreen
 import com.example.ui.screens.FullScreenVideoPlayerScreen
 import com.example.ui.screens.GitHubPlaylistScreen
 import com.example.ui.screens.HomeDashboardScreen
+import com.example.ui.screens.LinkHealthCheckerScreen
 import com.example.ui.screens.MusicLibraryScreen
 import com.example.ui.screens.PlaybackHistoryScreen
 import com.example.ui.screens.PlaylistsScreen
@@ -48,15 +50,39 @@ import com.example.ui.screens.SubtitleManagerScreen
 import com.example.ui.screens.VideoLibraryScreen
 import com.example.ui.screens.VisualizerStudioScreen
 import com.example.ui.theme.MatrixPlayerTheme
+import com.example.util.configureAppCheck
 import com.example.viewmodel.MatrixPlayerViewModel
+
+import android.Manifest
+import android.os.Build
+import androidx.activity.result.contract.ActivityResultContracts
 
 class MainActivity : ComponentActivity() {
 
     private val viewModel: MatrixPlayerViewModel by viewModels()
 
+    private val permissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val recordAudioGranted = permissions[Manifest.permission.RECORD_AUDIO] ?: false
+        if (recordAudioGranted) {
+            // Re-check visualizer session if granted
+            viewModel.uiState.value.let { state ->
+                // Audio session will automatically attach if active
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        configureAppCheck(this, intent)
         enableEdgeToEdge()
+
+        val permsToRequest = mutableListOf(Manifest.permission.RECORD_AUDIO)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        permissionLauncher.launch(permsToRequest.toTypedArray())
 
         setContent {
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -218,6 +244,7 @@ fun MatrixAppContent(viewModel: MatrixPlayerViewModel) {
 
                         Screen.FullScreenMusicPlayer -> FullScreenMusicPlayerScreen(
                             uiState = uiState,
+                            reactiveFrame = viewModel.reactiveAudioFrame.collectAsStateWithLifecycle().value,
                             onPlayPause = { viewModel.togglePlayPause() },
                             onNext = { viewModel.nextTrack() },
                             onPrevious = { viewModel.previousTrack() },
@@ -274,11 +301,26 @@ fun MatrixAppContent(viewModel: MatrixPlayerViewModel) {
                             streamingManager = viewModel.streamingManager,
                             onPlayStation = { station -> viewModel.playStreamStation(station) },
                             onNavigateToGitHub = { navigateTo(Screen.GitHubPlaylists) },
+                            onNavigateToHealthChecker = { navigateTo(Screen.LinkHealthChecker) },
                             onBack = { popBack() }
                         )
 
                         Screen.GitHubPlaylists -> GitHubPlaylistScreen(
                             playlistManager = viewModel.gitHubPlaylistManager,
+                            repository = viewModel.repository,
+                            onPlayTrack = { track -> viewModel.playTrack(track) },
+                            onBack = { popBack() }
+                        )
+
+                        Screen.AiChat -> AiChatScreen(
+                            aiEngine = viewModel.aiEngine,
+                            currentTrack = uiState.currentTrack,
+                            currentVideo = uiState.currentVideo,
+                            onBack = { popBack() }
+                        )
+
+                        Screen.LinkHealthChecker -> LinkHealthCheckerScreen(
+                            checkerEngine = viewModel.healthCheckerEngine,
                             repository = viewModel.repository,
                             onPlayTrack = { track -> viewModel.playTrack(track) },
                             onBack = { popBack() }

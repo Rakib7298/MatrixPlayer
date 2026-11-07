@@ -95,8 +95,13 @@ class MatrixMediaPlaybackService : MediaSessionService() {
                         .add(SessionCommand(ACTION_REPEAT, Bundle.EMPTY))
                         .build()
 
+                    val extras = Bundle().apply {
+                        putInt("audio_session_id", player.audioSessionId)
+                    }
+
                     return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
                         .setAvailableSessionCommands(sessionCommands)
+                        .setSessionExtras(extras)
                         .build()
                 }
 

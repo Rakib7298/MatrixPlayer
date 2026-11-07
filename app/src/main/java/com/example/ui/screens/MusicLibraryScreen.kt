@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -16,13 +17,17 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Album
-import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Person
@@ -30,6 +35,9 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.filled.ViewList
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -50,6 +58,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.model.MediaSortOption
 import com.example.model.TrackItem
 import com.example.ui.components.CrystalGlassCard
 import com.example.ui.components.MatrixTopAppBar
@@ -67,11 +76,49 @@ fun MusicLibraryScreen(
 ) {
     val colors = LocalMatrixColors.current
     var searchQuery by remember { mutableStateOf("") }
-    val filteredTracks = remember(searchQuery, tracks) {
-        if (searchQuery.isBlank()) tracks
-        else tracks.filter {
-            it.title.contains(searchQuery, ignoreCase = true) ||
-                    it.artist.contains(searchQuery, ignoreCase = true)
+    var sortOption by remember { mutableStateOf(MediaSortOption.TITLE_ASC) }
+    var isGridView by remember { mutableStateOf(false) }
+    var sortDropdownExpanded by remember { mutableStateOf(false) }
+    var selectedFolderFilter by remember { mutableStateOf<String?>(null) }
+
+    // Discover unique folder categories from track URIs
+    val folderCategories = remember(tracks) {
+        val folders = tracks.map { track ->
+            val uriStr = track.uri
+            when {
+                uriStr.contains("/") -> uriStr.substringBeforeLast("/").substringAfterLast("/")
+                else -> "Default Media"
+            }
+        }.distinct().filter { it.isNotBlank() }
+        listOf("All Folders") + folders
+    }
+
+    val processedTracks = remember(searchQuery, tracks, sortOption, selectedFolderFilter) {
+        var list = tracks
+
+        // Apply folder filter
+        if (selectedFolderFilter != null && selectedFolderFilter != "All Folders") {
+            list = list.filter { track ->
+                track.uri.contains(selectedFolderFilter!!, ignoreCase = true)
+            }
+        }
+
+        // Apply search query
+        if (searchQuery.isNotBlank()) {
+            list = list.filter {
+                it.title.contains(searchQuery, ignoreCase = true) ||
+                        it.artist.contains(searchQuery, ignoreCase = true) ||
+                        it.album.contains(searchQuery, ignoreCase = true)
+            }
+        }
+
+        // Apply sorting
+        when (sortOption) {
+            MediaSortOption.TITLE_ASC -> list.sortedBy { it.title.lowercase() }
+            MediaSortOption.TITLE_DESC -> list.sortedByDescending { it.title.lowercase() }
+            MediaSortOption.ARTIST_ASC -> list.sortedBy { it.artist.lowercase() }
+            MediaSortOption.DURATION_DESC -> list.sortedByDescending { it.durationMs }
+            MediaSortOption.DURATION_ASC -> list.sortedBy { it.durationMs }
         }
     }
 
@@ -83,6 +130,16 @@ fun MusicLibraryScreen(
         MatrixTopAppBar(
             title = "Music Library",
             actions = {
+                IconButton(
+                    onClick = { isGridView = !isGridView },
+                    modifier = Modifier.testTag("btn_toggle_view_mode")
+                ) {
+                    Icon(
+                        imageVector = if (isGridView) Icons.Default.ViewList else Icons.Default.GridView,
+                        contentDescription = "Toggle Grid/List View",
+                        tint = colors.accentGlow
+                    )
+                }
                 IconButton(
                     onClick = onShuffleAll,
                     modifier = Modifier.testTag("btn_shuffle_library")
@@ -96,7 +153,7 @@ fun MusicLibraryScreen(
             }
         )
 
-        // Subcategory Pills (Albums, Artists, Folders, Playlists)
+        // Subcategory & Folder Filter Pills
         LazyRow(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -106,10 +163,10 @@ fun MusicLibraryScreen(
                     shape = RoundedCornerShape(16.dp),
                     backgroundColor = colors.accentGlow.copy(alpha = 0.2f),
                     borderColor = colors.accentGlow,
-                    modifier = Modifier.clickable { }
+                    modifier = Modifier.clickable { selectedFolderFilter = null }
                 ) {
                     Text(
-                        text = "Tracks (${tracks.size})",
+                        text = "Tracks (${processedTracks.size})",
                         style = MaterialTheme.typography.labelLarge,
                         color = colors.accentGlow,
                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
@@ -167,112 +224,237 @@ fun MusicLibraryScreen(
                     }
                 }
             }
-            item {
-                CrystalGlassCard(
-                    shape = RoundedCornerShape(16.dp),
-                    backgroundColor = colors.glassCardBackground,
-                    borderColor = colors.glassBorder,
-                    modifier = Modifier.clickable { onNavigate(Screen.Playlists) }
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+        }
+
+        // Folder Filter Row
+        if (folderCategories.size > 1) {
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                items(folderCategories) { folderName ->
+                    val isSelected = (selectedFolderFilter == folderName) || (selectedFolderFilter == null && folderName == "All Folders")
+                    CrystalGlassCard(
+                        shape = RoundedCornerShape(12.dp),
+                        backgroundColor = if (isSelected) colors.accentGlow.copy(alpha = 0.25f) else colors.backgroundSurface.copy(alpha = 0.4f),
+                        borderColor = if (isSelected) colors.accentGlow else colors.glassBorder,
+                        modifier = Modifier.clickable {
+                            selectedFolderFilter = if (folderName == "All Folders") null else folderName
+                        }
                     ) {
-                        Icon(Icons.Default.QueueMusic, contentDescription = null, tint = colors.textSecondary, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Playlists", style = MaterialTheme.typography.labelLarge, color = colors.textPrimary)
+                        Text(
+                            text = "📁 $folderName",
+                            fontSize = 12.sp,
+                            color = if (isSelected) colors.accentGlow else colors.textSecondary,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        )
                     }
                 }
             }
         }
 
-        // Search Bar
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
+        // Search and Sort Control Row
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-                .testTag("search_tracks_field"),
-            placeholder = { Text("Search title, artist or album...", color = colors.textSecondary) },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = colors.accentGlow) },
-            shape = RoundedCornerShape(20.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = colors.accentGlow,
-                unfocusedBorderColor = colors.glassBorder,
-                focusedContainerColor = colors.backgroundSurface.copy(alpha = 0.5f),
-                unfocusedContainerColor = colors.backgroundSurface.copy(alpha = 0.3f),
-                focusedTextColor = colors.textPrimary,
-                unfocusedTextColor = colors.textPrimary
-            ),
-            singleLine = true
-        )
-
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            items(filteredTracks) { track ->
-                val isPlayingCurrent = track.id == currentTrackId
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("search_tracks_field"),
+                placeholder = { Text("Search music...", color = colors.textSecondary, fontSize = 13.sp) },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = colors.accentGlow, modifier = Modifier.size(18.dp)) },
+                shape = RoundedCornerShape(16.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = colors.accentGlow,
+                    unfocusedBorderColor = colors.glassBorder,
+                    focusedContainerColor = colors.backgroundSurface.copy(alpha = 0.5f),
+                    unfocusedContainerColor = colors.backgroundSurface.copy(alpha = 0.3f),
+                    focusedTextColor = colors.textPrimary,
+                    unfocusedTextColor = colors.textPrimary
+                ),
+                singleLine = true
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            // Sort Dropdown Chip
+            Box {
                 CrystalGlassCard(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 5.dp)
-                        .clickable { onTrackClick(track) },
-                    shape = RoundedCornerShape(18.dp),
-                    backgroundColor = if (isPlayingCurrent) colors.accentGlow.copy(alpha = 0.15f) else colors.backgroundSurface.copy(alpha = 0.65f),
-                    borderColor = if (isPlayingCurrent) colors.accentGlow else colors.glassBorder,
-                    borderWidth = 1.dp,
-                    testTag = "track_card_${track.id}"
+                    shape = RoundedCornerShape(16.dp),
+                    backgroundColor = colors.backgroundSurface.copy(alpha = 0.5f),
+                    borderColor = colors.glassBorder,
+                    modifier = Modifier.clickable { sortDropdownExpanded = true }
                 ) {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(
+                        Text(
+                            text = sortOption.label,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = colors.accentGlow
+                        )
+                        Icon(
+                            imageVector = Icons.Default.ArrowDropDown,
+                            contentDescription = "Sort Options",
+                            tint = colors.accentGlow,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+
+                DropdownMenu(
+                    expanded = sortDropdownExpanded,
+                    onDismissRequest = { sortDropdownExpanded = false },
+                    modifier = Modifier.background(colors.backgroundSurface)
+                ) {
+                    MediaSortOption.values().forEach { option ->
+                        DropdownMenuItem(
+                            text = { Text(option.label, color = colors.textPrimary, fontSize = 13.sp) },
+                            onClick = {
+                                sortOption = option
+                                sortDropdownExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        // Main Content View (Grid vs List)
+        if (isGridView) {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                items(processedTracks) { track ->
+                    val isPlayingCurrent = track.id == currentTrackId
+                    CrystalGlassCard(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onTrackClick(track) },
+                        shape = RoundedCornerShape(16.dp),
+                        backgroundColor = if (isPlayingCurrent) colors.accentGlow.copy(alpha = 0.2f) else colors.backgroundSurface.copy(alpha = 0.65f),
+                        borderColor = if (isPlayingCurrent) colors.accentGlow else colors.glassBorder,
+                        borderWidth = 1.dp,
+                        testTag = "track_grid_card_${track.id}"
+                    ) {
+                        Column(
                             modifier = Modifier
-                                .size(46.dp)
-                                .clip(CircleShape)
-                                .background(colors.primaryGradient),
-                            contentAlignment = Alignment.Center
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Icon(
-                                imageVector = if (isPlayingCurrent) Icons.Default.MusicNote else Icons.Default.PlayArrow,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .aspectRatio(1f)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(colors.primaryGradient),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = if (isPlayingCurrent) Icons.Default.MusicNote else Icons.Default.PlayArrow,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(36.dp)
+                                )
+                            }
 
-                        Spacer(modifier = Modifier.width(14.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
 
-                        Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = track.title,
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                                 color = if (isPlayingCurrent) colors.accentGlow else colors.textPrimary,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
                             Text(
-                                text = "${track.artist} • ${track.album}",
+                                text = track.artist,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = colors.textSecondary,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
                         }
+                    }
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                items(processedTracks) { track ->
+                    val isPlayingCurrent = track.id == currentTrackId
+                    CrystalGlassCard(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                            .clickable { onTrackClick(track) },
+                        shape = RoundedCornerShape(16.dp),
+                        backgroundColor = if (isPlayingCurrent) colors.accentGlow.copy(alpha = 0.15f) else colors.backgroundSurface.copy(alpha = 0.65f),
+                        borderColor = if (isPlayingCurrent) colors.accentGlow else colors.glassBorder,
+                        borderWidth = 1.dp,
+                        testTag = "track_card_${track.id}"
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(46.dp)
+                                    .clip(CircleShape)
+                                    .background(colors.primaryGradient),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = if (isPlayingCurrent) Icons.Default.MusicNote else Icons.Default.PlayArrow,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
 
-                        Text(
-                            text = "${track.durationMs / 1000 / 60}:${String.format("%02d", (track.durationMs / 1000) % 60)}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = colors.textSecondary
-                        )
+                            Spacer(modifier = Modifier.width(14.dp))
 
-                        IconButton(onClick = {}) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "Options", tint = colors.textSecondary)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = track.title,
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                                    color = if (isPlayingCurrent) colors.accentGlow else colors.textPrimary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = "${track.artist} • ${track.album}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = colors.textSecondary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+
+                            Text(
+                                text = "${track.durationMs / 1000 / 60}:${String.format("%02d", (track.durationMs / 1000) % 60)}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = colors.textSecondary
+                            )
                         }
                     }
                 }

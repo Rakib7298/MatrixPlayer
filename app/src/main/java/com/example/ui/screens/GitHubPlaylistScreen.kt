@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.ContentPaste
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.MusicNote
@@ -72,8 +73,11 @@ import com.example.media.github.GitHubPlaylistManager
 import com.example.media.github.GitHubPresetPlaylist
 import com.example.media.github.M3uPlaylist
 import com.example.media.github.M3uTrack
+import com.example.media.m3u.M3uParserService
+import com.example.media.m3u.ParsedM3uPlaylist
 import com.example.model.TrackItem
 import com.example.ui.components.CrystalGlassCard
+import com.example.ui.components.M3uPreviewDialog
 import com.example.ui.components.MatrixTopAppBar
 import com.example.ui.theme.LocalMatrixColors
 import kotlinx.coroutines.launch
@@ -98,6 +102,7 @@ fun GitHubPlaylistScreen(
     var inputUrl by remember { mutableStateOf("") }
     var inputName by remember { mutableStateOf("") }
     var selectedAccentColor by remember { mutableStateOf("#00F0FF") }
+    var showDetailedModal by remember { mutableStateOf(false) }
 
     val accentColors = listOf("#00F0FF", "#1DE9B6", "#B026FF", "#E040FB", "#FF5252", "#F59E0B")
 
@@ -373,24 +378,46 @@ fun GitHubPlaylistScreen(
                             Spacer(modifier = Modifier.height(12.dp))
 
                             // Action to import directly to Room database
-                            Button(
-                                onClick = {
-                                    scope.launch {
-                                        playlistManager.importToRoomDatabase(playlist, repository, selectedAccentColor)
-                                    }
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .testTag("btn_import_room"),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = colors.accentGlow,
-                                    contentColor = colors.backgroundDeep
-                                ),
-                                shape = RoundedCornerShape(12.dp)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Icon(Icons.Default.QueueMusic, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Import to Room Database (${playlist.totalTracks} tracks)", fontWeight = FontWeight.Bold)
+                                Button(
+                                    onClick = {
+                                        scope.launch {
+                                            playlistManager.importToRoomDatabase(playlist, repository, selectedAccentColor)
+                                        }
+                                    },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("btn_import_room"),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = colors.accentGlow,
+                                        contentColor = colors.backgroundDeep
+                                    ),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Icon(Icons.Default.QueueMusic, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Quick Import", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                }
+
+                                Button(
+                                    onClick = { showDetailedModal = true },
+                                    modifier = Modifier
+                                        .weight(1.2f)
+                                        .testTag("btn_inspect_m3u"),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = colors.backgroundDeep.copy(alpha = 0.8f),
+                                        contentColor = colors.textPrimary
+                                    ),
+                                    shape = RoundedCornerShape(12.dp),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, colors.glassBorder)
+                                ) {
+                                    Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp), tint = colors.accentGlow)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Inspect & Select", fontSize = 12.sp)
+                                }
                             }
 
                             Spacer(modifier = Modifier.height(12.dp))
@@ -618,5 +645,29 @@ fun GitHubPlaylistScreen(
                 }
             }
         }
+    }
+
+    // Interactive M3U Entry Inspector Dialog
+    if (showDetailedModal && previewPlaylist != null) {
+        val parsedPlaylist = remember(previewPlaylist) {
+            val content = previewPlaylist!!.tracks.joinToString("\n") { track ->
+                "#EXTINF:${track.durationSec} group-title=\"${track.group}\",${track.artist} - ${track.title}\n${track.url}"
+            }
+            M3uParserService.parseM3uContent(content, previewPlaylist!!.name)
+        }
+
+        M3uPreviewDialog(
+            playlist = parsedPlaylist,
+            onDismiss = { showDetailedModal = false },
+            onConfirmImport = { playlistName, selectedEntries, colorHex ->
+                scope.launch {
+                    M3uParserService.saveEntriesToRoomDatabase(playlistName, selectedEntries, repository, colorHex)
+                    showDetailedModal = false
+                }
+            },
+            onPreviewPlayTrack = { track ->
+                onPlayTrack(track)
+            }
+        )
     }
 }

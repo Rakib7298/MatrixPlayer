@@ -86,6 +86,7 @@ fun StreamingSourcesScreen(
     streamingManager: StreamingManager,
     onPlayStation: (StreamStation) -> Unit,
     onNavigateToGitHub: () -> Unit = {},
+    onNavigateToHealthChecker: () -> Unit = {},
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -295,6 +296,64 @@ fun StreamingSourcesScreen(
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
                         ) {
                             Text("Open", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+
+            // 1.8. LINK HEALTH CHECKER SHORTCUT BANNER
+            item {
+                CrystalGlassCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onNavigateToHealthChecker() }
+                        .testTag("btn_goto_health_checker"),
+                    shape = RoundedCornerShape(20.dp),
+                    backgroundColor = colors.backgroundSurface.copy(alpha = 0.7f),
+                    borderColor = Color(0xFF10B981)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color(0xFF064E3B))
+                                .border(1.dp, Color(0xFF10B981), RoundedCornerShape(12.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.Sensors, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+                        }
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Link Health Checker Pro",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = colors.textPrimary
+                            )
+                            Text(
+                                text = "Probe latency (ms), HTTP status codes, and server headers for live feeds",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = colors.textSecondary
+                            )
+                        }
+
+                        Button(
+                            onClick = { onNavigateToHealthChecker() },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF10B981),
+                                contentColor = Color.Black
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                        ) {
+                            Text("Check", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }

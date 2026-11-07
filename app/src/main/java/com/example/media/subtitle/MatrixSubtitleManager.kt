@@ -120,6 +120,16 @@ class MatrixSubtitleManager(private val context: Context) {
         _settings.value = _settings.value.copy(lowerColor = color)
     }
 
+    val aiGenerator = GeminiSubtitleGeneratorEngine()
+
+    fun setUpperDelayMs(delayMs: Long) {
+        _settings.value = _settings.value.copy(upperDelayMs = delayMs)
+    }
+
+    fun setLowerDelayMs(delayMs: Long) {
+        _settings.value = _settings.value.copy(lowerDelayMs = delayMs)
+    }
+
     fun adjustUpperDelay(deltaMs: Long) {
         _settings.value = _settings.value.copy(upperDelayMs = _settings.value.upperDelayMs + deltaMs)
     }

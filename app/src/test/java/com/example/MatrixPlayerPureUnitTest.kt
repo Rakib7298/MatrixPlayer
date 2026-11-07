@@ -284,4 +284,76 @@ class MatrixPlayerPureUnitTest {
         assertEquals("Ambient", track2.group)
         assertEquals("https://ice1.somafm.com/dronezone-128-mp3", track2.url)
     }
+
+    @Test
+    fun m3uParserService_extractsExtInfMetadataAndStreamTypes() {
+        val rawM3u = """
+            #EXTM3U
+            #EXTINF:180 tvg-id="ch_1" tvg-name="HLS Stream" tvg-logo="https://example.com/logo.png" group-title="Cyber HLS",Vaporwave - Floating Hologram
+            https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8
+
+            #EXTINF:-1 group-title="Chillhop",Acoustic Lofi Beats - Rain & Coffee
+            https://stream.zeno.fm/f3wvbbqmdg8uv
+        """.trimIndent()
+
+        val parsed = com.example.media.m3u.M3uParserService.parseM3uContent(rawM3u, "Cyberpunk_Mix.m3u8")
+
+        assertEquals("Cyberpunk Mix", parsed.name)
+        assertEquals(2, parsed.totalEntriesCount)
+        assertEquals(2, parsed.selectedEntriesCount)
+
+        val entry1 = parsed.entries[0]
+        assertEquals("Floating Hologram", entry1.metadata.title)
+        assertEquals("Vaporwave", entry1.metadata.artist)
+        assertEquals(180, entry1.metadata.durationSec)
+        assertEquals("Cyber HLS", entry1.metadata.groupTitle)
+        assertEquals("https://example.com/logo.png", entry1.metadata.logoUrl)
+        assertEquals("ch_1", entry1.metadata.tvgId)
+        assertEquals(com.example.media.m3u.M3uStreamType.HLS_M3U8, entry1.metadata.streamType)
+        assertEquals("3:00", entry1.durationText)
+
+        val entry2 = parsed.entries[1]
+        assertEquals("Rain & Coffee", entry2.metadata.title)
+        assertEquals("Acoustic Lofi Beats", entry2.metadata.artist)
+        assertEquals(-1, entry2.metadata.durationSec)
+        assertEquals("Chillhop", entry2.metadata.groupTitle)
+        assertEquals(com.example.media.m3u.M3uStreamType.AUDIO_STREAM, entry2.metadata.streamType)
+        assertEquals("LIVE", entry2.durationText)
+    }
+
+    @Test
+    fun linkHealthResult_attributesAndProtocolDetection() {
+        val result = com.example.media.streaming.LinkHealthResult(
+            url = "https://stream.nightride.fm/synthwave.mp3",
+            title = "Nightride FM Synthwave",
+            httpCode = 200,
+            latencyMs = 24L,
+            contentType = "audio/mpeg",
+            protocol = com.example.media.streaming.StreamProtocol.HTTP_MP3,
+            healthStatus = com.example.media.streaming.StreamHealth.EXCELLENT,
+            isReachable = true
+        )
+        assertEquals("https://stream.nightride.fm/synthwave.mp3", result.url)
+        assertEquals(200, result.httpCode)
+        assertEquals(24L, result.latencyMs)
+        assertEquals(com.example.media.streaming.StreamHealth.EXCELLENT, result.healthStatus)
+        assertTrue(result.isReachable)
+    }
+
+    @Test
+    fun aiChatModels_optionsAndSenders() {
+        val options = com.example.media.ai.AiModelOption.values()
+        assertEquals(3, options.size)
+        assertEquals("gemini-3.8-flash", com.example.media.ai.AiModelOption.FLASH_DEFAULT.modelId)
+        assertEquals("gemini-3.5-flash-lite", com.example.media.ai.AiModelOption.FLASH_LITE.modelId)
+        assertEquals("gemini-4-argon", com.example.media.ai.AiModelOption.ARGON_REASONING.modelId)
+
+        val msg = com.example.media.ai.ChatMessage(
+            sender = com.example.media.ai.MessageSender.ASSISTANT,
+            text = "Content summary generated for current video track.",
+            modelName = "gemini-3.8-flash"
+        )
+        assertEquals(com.example.media.ai.MessageSender.ASSISTANT, msg.sender)
+        assertEquals("gemini-3.8-flash", msg.modelName)
+    }
 }

@@ -30,6 +30,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
@@ -44,6 +45,7 @@ import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -62,6 +64,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -74,10 +77,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.media.subtitle.AiSubtitleUiState
 import com.example.media.subtitle.MatrixSubtitleManager
 import com.example.media.subtitle.OnlineSubtitleResult
 import com.example.ui.theme.RefBlueCyanGlow
 import com.example.ui.theme.RefPurpleLight
+import kotlinx.coroutines.launch
 
 val AvailableTargetLanguages = listOf("English(cc)", "Spanish(Español)", "Japanese(日本語)", "French(Français)", "German(Deutsch)")
 val AvailableMotherLanguages = listOf("Bengali(বাংলা)", "Hindi(हिन्दी)", "Arabic(العربية)", "Chinese(中文)", "Korean(한국어)", "Spanish(Español)")
@@ -106,11 +111,19 @@ fun SubtitleManagerScreen(
 ) {
     val settings by subtitleManager.settings.collectAsStateWithLifecycle()
     val onlineResults by subtitleManager.onlineResults.collectAsStateWithLifecycle()
+    val aiState by subtitleManager.aiGenerator.state.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
 
     var activeTab by remember { mutableStateOf("Subtitles") }
     var isAdvancedOpen by remember { mutableStateOf(false) }
     var showOnlineSearchSheet by remember { mutableStateOf(false) }
     var targetLanguageForDownload by remember { mutableStateOf(true) } // true = Upper, false = Lower
+
+    // AI Subtitle Generator State
+    var aiMediaTitle by remember { mutableStateOf("Matrix Audio Stream - Noctara Acoustic") }
+    var aiTargetLang by remember { mutableStateOf("English(cc)") }
+    var aiIsUpperTrack by remember { mutableStateOf(true) }
+    var showAiLangDropdown by remember { mutableStateOf(false) }
 
     // Dropdown expansion state
     var showUpperLangDropdown by remember { mutableStateOf(false) }
@@ -266,7 +279,185 @@ fun SubtitleManagerScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    if (activeTab == "Subtitles") {
+                        // GEMINI AI SUBTITLE GENERATOR STUDIO CARD
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(18.dp))
+                                .background(Color(0x331E2438))
+                                .border(1.dp, Brush.horizontalGradient(listOf(RefBlueCyanGlow, RefPurpleLight)), RoundedCornerShape(18.dp))
+                                .padding(16.dp)
+                        ) {
+                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = RefBlueCyanGlow, modifier = Modifier.size(18.dp))
+                                        Text("GEMINI AI SUBTITLE GENERATOR STUDIO", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(Color(0x3300F0FF))
+                                            .padding(horizontal = 8.dp, vertical = 2.dp)
+                                    ) {
+                                        Text("gemini-3.8-flash", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = RefBlueCyanGlow)
+                                    }
+                                }
+
+                                Text("Generate time-synced SRT captions from audio streams, transcripts, or media topics in real time.", fontSize = 11.sp, color = Color(0xFF94A3B8))
+
+                                OutlinedTextField(
+                                    value = aiMediaTitle,
+                                    onValueChange = { aiMediaTitle = it },
+                                    label = { Text("Audio Stream / Media Title") },
+                                    singleLine = true,
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = RefBlueCyanGlow,
+                                        unfocusedBorderColor = Color(0xFF334155),
+                                        focusedTextColor = Color.White,
+                                        unfocusedTextColor = Color.White,
+                                        focusedLabelColor = RefBlueCyanGlow,
+                                        unfocusedLabelColor = Color(0xFF94A3B8)
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    // Target Language Selector
+                                    Box(modifier = Modifier.weight(1f)) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(Color(0xFF262933))
+                                                .clickable { showAiLangDropdown = true }
+                                                .padding(horizontal = 10.dp, vertical = 10.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(aiTargetLang, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                            Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color(0xFFA1A1AA), modifier = Modifier.size(18.dp))
+                                        }
+
+                                        DropdownMenu(
+                                            expanded = showAiLangDropdown,
+                                            onDismissRequest = { showAiLangDropdown = false },
+                                            modifier = Modifier.background(Color(0xFF1E2230))
+                                        ) {
+                                            AvailableTargetLanguages.forEach { lang ->
+                                                DropdownMenuItem(
+                                                    text = { Text(lang, color = Color.White) },
+                                                    onClick = {
+                                                        aiTargetLang = lang
+                                                        showAiLangDropdown = false
+                                                    }
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    // Target Track Switch (Upper vs Lower)
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(Color(0xFF262933))
+                                            .clickable { aiIsUpperTrack = !aiIsUpperTrack }
+                                            .padding(horizontal = 12.dp, vertical = 10.dp)
+                                    ) {
+                                        Text(
+                                            text = if (aiIsUpperTrack) "Track: Upper" else "Track: Lower",
+                                            color = if (aiIsUpperTrack) RefBlueCyanGlow else Color(0xFFEF4444),
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+
+                                // Generate Button
+                                Button(
+                                    onClick = {
+                                        scope.launch {
+                                            subtitleManager.aiGenerator.generateTimeSyncedSubtitles(
+                                                mediaTitle = aiMediaTitle,
+                                                targetLanguage = aiTargetLang
+                                            )
+                                        }
+                                    },
+                                    enabled = aiState !is AiSubtitleUiState.Generating,
+                                    colors = ButtonDefaults.buttonColors(containerColor = RefBlueCyanGlow),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    if (aiState is AiSubtitleUiState.Generating) {
+                                        CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.Black, strokeWidth = 2.dp)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Generating Synced Subtitles with Gemini...", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    } else {
+                                        Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color.Black, modifier = Modifier.size(18.dp))
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Generate Time-Synced Subtitles with Gemini", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    }
+                                }
+
+                                // Status & Result Display
+                                when (val state = aiState) {
+                                    is AiSubtitleUiState.Generating -> {
+                                        Text("Analyzing stream audio timestamps & synthesizing SRT cues...", fontSize = 11.sp, color = RefBlueCyanGlow)
+                                    }
+                                    is AiSubtitleUiState.Success -> {
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(Color(0x4400F0FF))
+                                                .padding(10.dp),
+                                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Text("✓ Generated ${state.cues.size} time-synced SRT cues in ${state.language}!", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.End
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(8.dp))
+                                                        .background(Brush.horizontalGradient(listOf(RefBlueCyanGlow, RefPurpleLight)))
+                                                        .clickable {
+                                                            subtitleManager.loadExternalSubtitle(state.srtContent, aiIsUpperTrack)
+                                                            if (aiIsUpperTrack) subtitleManager.setUpperLanguage(state.language)
+                                                            else subtitleManager.setLowerLanguage(state.language)
+                                                        }
+                                                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                                                ) {
+                                                    Text("Apply to Subtitle Track", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                }
+                                            }
+                                        }
+                                    }
+                                    is AiSubtitleUiState.Error -> {
+                                        Text("Error: ${state.message}", fontSize = 11.sp, color = Color(0xFFEF4444), fontWeight = FontWeight.Medium)
+                                    }
+                                    AiSubtitleUiState.Idle -> {}
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(20.dp))
+                    }
 
                     // SUBTITLES TABLE HEADER
                     Row(
@@ -651,64 +842,126 @@ fun SubtitleManagerScreen(
                                 .padding(16.dp),
                             verticalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
-                            Text("Synchronization & Encoding (±50ms Precision)", color = RefBlueCyanGlow, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text("Synchronization & Offset Sliders (±5000ms Range)", color = RefBlueCyanGlow, fontWeight = FontWeight.Bold, fontSize = 13.sp)
 
-                            // Upper Subtitle Sync Stepper
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text("Upper Subtitle Sync Offset:", color = Color.White, fontSize = 12.sp)
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            // Upper Subtitle Sync Offset Slider
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Upper Subtitle Sync Offset:", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                    Text(
+                                        text = "${if (settings.upperDelayMs > 0) "+" else ""}${settings.upperDelayMs} ms (${String.format("%.2f", settings.upperDelayMs / 1000f)}s)",
+                                        color = RefBlueCyanGlow,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
                                     Box(
                                         modifier = Modifier
                                             .clip(CircleShape)
                                             .background(Color(0x33FFFFFF))
                                             .clickable { subtitleManager.adjustUpperDelay(-50L) }
-                                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
                                     ) {
-                                        Text("-50ms", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        Text("-50ms", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                     }
-                                    Text("${settings.upperDelayMs} ms", color = RefBlueCyanGlow, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    Slider(
+                                        value = settings.upperDelayMs.toFloat(),
+                                        onValueChange = { subtitleManager.setUpperDelayMs(it.toLong()) },
+                                        valueRange = -5000f..5000f,
+                                        modifier = Modifier.weight(1f),
+                                        colors = SliderDefaults.colors(
+                                            thumbColor = RefBlueCyanGlow,
+                                            activeTrackColor = RefBlueCyanGlow,
+                                            inactiveTrackColor = Color(0xFF262933)
+                                        )
+                                    )
                                     Box(
                                         modifier = Modifier
                                             .clip(CircleShape)
                                             .background(Color(0x33FFFFFF))
                                             .clickable { subtitleManager.adjustUpperDelay(50L) }
-                                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
                                     ) {
-                                        Text("+50ms", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        Text("+50ms", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(Color(0x33EF4444))
+                                            .clickable { subtitleManager.setUpperDelayMs(0L) }
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Text("Reset", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
 
-                            // Lower Subtitle Sync Stepper
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text("Lower Subtitle Sync Offset:", color = Color.White, fontSize = 12.sp)
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            // Lower Subtitle Sync Offset Slider
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Lower Subtitle Sync Offset:", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                    Text(
+                                        text = "${if (settings.lowerDelayMs > 0) "+" else ""}${settings.lowerDelayMs} ms (${String.format("%.2f", settings.lowerDelayMs / 1000f)}s)",
+                                        color = Color(0xFFEF4444),
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
                                     Box(
                                         modifier = Modifier
                                             .clip(CircleShape)
                                             .background(Color(0x33FFFFFF))
                                             .clickable { subtitleManager.adjustLowerDelay(-50L) }
-                                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
                                     ) {
-                                        Text("-50ms", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        Text("-50ms", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                     }
-                                    Text("${settings.lowerDelayMs} ms", color = Color(0xFFEF4444), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    Slider(
+                                        value = settings.lowerDelayMs.toFloat(),
+                                        onValueChange = { subtitleManager.setLowerDelayMs(it.toLong()) },
+                                        valueRange = -5000f..5000f,
+                                        modifier = Modifier.weight(1f),
+                                        colors = SliderDefaults.colors(
+                                            thumbColor = Color(0xFFEF4444),
+                                            activeTrackColor = Color(0xFFEF4444),
+                                            inactiveTrackColor = Color(0xFF262933)
+                                        )
+                                    )
                                     Box(
                                         modifier = Modifier
                                             .clip(CircleShape)
                                             .background(Color(0x33FFFFFF))
                                             .clickable { subtitleManager.adjustLowerDelay(50L) }
-                                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
                                     ) {
-                                        Text("+50ms", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        Text("+50ms", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(Color(0x33EF4444))
+                                            .clickable { subtitleManager.setLowerDelayMs(0L) }
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Text("Reset", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }

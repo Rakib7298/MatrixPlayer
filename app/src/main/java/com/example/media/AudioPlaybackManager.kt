@@ -27,7 +27,8 @@ data class PlaybackEngineState(
     val durationMs: Long = 0L,
     val isShuffle: Boolean = false,
     val repeatMode: Int = Player.REPEAT_MODE_OFF,
-    val currentMediaId: String? = null
+    val currentMediaId: String? = null,
+    val audioSessionId: Int = 0
 )
 
 @OptIn(UnstableApi::class)
@@ -100,6 +101,7 @@ class AudioPlaybackManager(
         val currentId = player.currentMediaItem?.mediaId
         val dur = if (player.duration > 0) player.duration else 0L
         val pos = if (player.currentPosition > 0) player.currentPosition else 0L
+        val sessionId = player.sessionExtras.getInt("audio_session_id", 0)
 
         _engineState.value = _engineState.value.copy(
             isPlaying = player.isPlaying,
@@ -107,7 +109,8 @@ class AudioPlaybackManager(
             durationMs = dur,
             isShuffle = player.shuffleModeEnabled,
             repeatMode = player.repeatMode,
-            currentMediaId = currentId
+            currentMediaId = currentId,
+            audioSessionId = sessionId
         )
     }
 

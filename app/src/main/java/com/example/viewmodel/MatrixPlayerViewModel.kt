@@ -52,6 +52,8 @@ class MatrixPlayerViewModel(application: Application) : AndroidViewModel(applica
     val subtitleManager = com.example.media.subtitle.MatrixSubtitleManager(application)
     val streamingManager = com.example.media.streaming.StreamingManager(application, viewModelScope)
     val gitHubPlaylistManager = com.example.media.github.GitHubPlaylistManager(application, viewModelScope)
+    val aiEngine = com.example.media.ai.MatrixAiChatEngine(application, viewModelScope)
+    val healthCheckerEngine = com.example.media.streaming.LinkHealthCheckerEngine(application)
 
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
@@ -206,6 +208,26 @@ class MatrixPlayerViewModel(application: Application) : AndroidViewModel(applica
                         _uiState.value = _uiState.value.copy(currentPositionMs = next)
                     }
                 }
+            }
+        }
+
+        // Attach RealAudioVisualizerEngine & AndroidAudioEffectManager to Media3 audio session ID
+        viewModelScope.launch {
+            playbackManager.engineState.collect { engineState ->
+                if (engineState.audioSessionId > 0) {
+                    visualizerEngine.attachAudioSession(engineState.audioSessionId)
+                    effectManager.attachAudioSession(engineState.audioSessionId)
+                }
+            }
+        }
+
+        // Ticking audio-reactive loop for DSP fallback frame generation
+        viewModelScope.launch {
+            var t = 0f
+            while (true) {
+                delay(50)
+                t += 0.1f
+                visualizerEngine.updateSimulatedFrame(t, _uiState.value.isPlaying)
             }
         }
     }

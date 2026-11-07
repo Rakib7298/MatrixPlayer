@@ -20,4 +20,6 @@ sealed class Screen(val route: String, val title: String) {
     object Settings : Screen("settings", "Settings")
     object About : Screen("about", "About")
     object GitHubPlaylists : Screen("github_playlists", "GitHub Playlists")
+    object AiChat : Screen("ai_chat", "Matrix AI Chat")
+    object LinkHealthChecker : Screen("link_health_checker", "Link Health")
 }

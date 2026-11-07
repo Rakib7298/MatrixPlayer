@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Album
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.Favorite
@@ -32,6 +33,7 @@ import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.QueueMusic
+import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material.icons.filled.VideoLibrary
@@ -87,7 +89,9 @@ fun HomeDashboardScreen(
         QuickAction("Albums", Icons.Default.Album, Screen.Albums, Color(0xFF00B0FF)),
         QuickAction("Artists", Icons.Default.Person, Screen.Artists, Color(0xFFE040FB)),
         QuickAction("Subtitles", Icons.Default.Subtitles, Screen.SubtitleManager, Color(0xFF69F0AE)),
-        QuickAction("GitHub M3U", Icons.Default.Code, Screen.GitHubPlaylists, Color(0xFF6E40C9))
+        QuickAction("GitHub M3U", Icons.Default.Code, Screen.GitHubPlaylists, Color(0xFF6E40C9)),
+        QuickAction("AI Chat", Icons.Default.AutoAwesome, Screen.AiChat, Color(0xFF00F0FF)),
+        QuickAction("Link Health", Icons.Default.Sensors, Screen.LinkHealthChecker, Color(0xFF10B981))
     )
 
     LazyColumn(
@@ -125,18 +129,34 @@ fun HomeDashboardScreen(
                         )
                     }
 
-                    IconButton(
-                        onClick = { onNavigate(Screen.Settings) },
-                        modifier = Modifier
-                            .size(42.dp)
-                            .clip(CircleShape)
-                            .background(colors.glassCardBackground)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = "Settings",
-                            tint = colors.textPrimary
-                        )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        IconButton(
+                            onClick = { onNavigate(Screen.AiChat) },
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(CircleShape)
+                                .background(colors.accentGlow)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.AutoAwesome,
+                                contentDescription = "AI Chat",
+                                tint = colors.backgroundDeep
+                            )
+                        }
+
+                        IconButton(
+                            onClick = { onNavigate(Screen.Settings) },
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(CircleShape)
+                                .background(colors.glassCardBackground)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Settings",
+                                tint = colors.textPrimary
+                            )
+                        }
                     }
                 }
             }

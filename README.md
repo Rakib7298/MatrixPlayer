@@ -4,11 +4,11 @@ A premium, offline-first native Android audio and video player built with Jetpac
 
 ---
 
-## Completed Phases
+## Completed Phases & Advanced AI Features
 
 ### Phase 1: Project Foundation, Theme System & Navigation
 - Multi-theme engine: **Midnight Neon**, **Aqua Liquid Glass**, and **Dynamic Album Art**.
-- Full navigation graph with 19 distinct screens and backstack handling.
+- Full navigation graph with 21 distinct screens and backstack handling.
 - Super Crystal Liquid Glass components (`CrystalGlassCard`, `GlassVolumeSlider`, `RibbedDialKnob`, custom glowing top app bars).
 
 ### Phase 2: Local Media Discovery, Room Database & Offline Library
@@ -48,22 +48,28 @@ A premium, offline-first native Android audio and video player built with Jetpac
   - Curated preset stations: Nightride FM Synthwave & Chillsynth, Matrix Lo-Fi Chillhop Radio, SomaFM Groove Salad, Drone Zone, DEF CON Radio, and MUX Live HLS.
   - Station bookmarking and filter tabs.
 
-### Phase 8: GitHub Raw Playlist Integration
-- **GitHub M3U / M3U8 Parser (`GitHubPlaylistParser`)**:
-  - Automatically normalizes standard GitHub web URLs (`github.com/.../blob/main/...`) into direct raw content endpoints (`raw.githubusercontent.com/.../main/...`).
-  - Robust `#EXTM3U` and `#EXTINF` parser extracting track durations, titles, artists, `tvg-logo` artwork URLs, and `group-title` categories.
-- **GitHub Playlist Manager (`GitHubPlaylistManager.kt`)**:
-  - Fetches raw playlists asynchronously over network with error-handling and curated offline fallbacks.
-  - Room database synchronization: creates persistent `PlaylistEntity` with custom accent colors and inserts parsed tracks into `MediaDao` (`MediaItemEntity`), linking them via `PlaylistItemEntity`.
-  - Re-sync / Refresh capability to pull the latest versions of community playlists from GitHub repositories.
-- **GitHub Playlists UI (`GitHubPlaylistScreen.kt`)**:
-  - Super Crystal Liquid Glass control cards with paste-from-clipboard support.
-  - Interactive parsed playlist preview showing track count, total calculated duration, sample track listings, and individual preview playback.
-  - Curated open source community repositories (*Cyberwave & Synthwave 24/7 Mix*, *Lo-Fi Study & Chillhop Archive*, *Ambient Space & Deep Drone Feeds*, *Free Lossless Audio & FLAC Radio*).
-  - Navigation integrations from Home Dashboard quick actions and Streaming Sources.
+### Phase 8: GitHub Raw Playlist Integration & M3U Parser Service
+- **Robust M3U/M3U8 Parser Service (`M3uParserService.kt`)**:
+  - Extracts `#EXTINF` metadata: track duration, title, artist, `tvg-logo` artwork URLs, `group-title` categories, `tvg-id`, `tvg-name`, and stream type detection (`HLS_M3U8`, `AUDIO_STREAM`, `DASH_MPD`, `VIDEO_STREAM`).
+  - Normalizes raw GitHub URLs (`github.com/.../blob/main/...` -> `raw.githubusercontent.com/.../main/...`).
+- **Interactive M3U Entry Inspector Component (`M3uPreviewDialog.kt`)**:
+  - Preview UI dialog letting users select/deselect individual tracks, edit title/artist/group metadata in-line, test stream playback, pick playlist accent color, and commit selected entries to Room database.
+- **GitHub Playlist Manager (`GitHubPlaylistManager.kt` & `GitHubPlaylistScreen.kt`)**:
+  - Asynchronously fetches raw playlists over network with error-handling and curated Cyberpunk, Lo-Fi, Ambient, and Lossless FLAC presets.
+  - Room database synchronization and re-sync capabilities.
+
+### Phase 9: AI Chatbot & Advanced Glass Link Health Checker Pro
+- **Matrix AI Chatbot Studio (`MatrixAiChatEngine.kt` & `AiChatScreen.kt`)**:
+  - Multi-turn Gemini AI thread supporting `gemini-3.8-flash` (balanced), `gemini-3.5-flash-lite` (fast), and `gemini-4-argon` (pro reasoning).
+  - Context-aware media assistant: summarizes active audio/video tracks, recommends similar music/videos, generates dual-language subtitle tracks, sources fresh M3U/M3U8 streams, and discovers open-source GitHub media repos.
+  - Super Crystal Liquid Glass chat interface with quick action prompt chips, model selector bar, and scrollable message thread.
+- **Advanced Glass Link Health Checker Pro (`LinkHealthCheckerEngine.kt` & `LinkHealthCheckerScreen.kt`)**:
+  - Probe single or batch stream URLs for network latency (ms), HTTP response status codes, server headers, and MIME content-types.
+  - Health rating badges (*Ultra Low Latency 12ms*, *Healthy / Active 35ms*, *Degraded*, *Offline*).
+  - One-tap export to import healthy stream links into Room database or launch playback in Matrix Player.
 
 ---
 
-## Pending Phases
-
-- **PHASE 9**: Testing, optimization, and release preparation.
+## Release Verification
+- Verified JVM unit test suite: `gradle :app:testDebugUnitTest` executed with **BUILD SUCCESSFUL** (20 tests passing).
+- Verified applet compilation: `compile_applet` passed cleanly.
