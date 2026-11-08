@@ -8,7 +8,8 @@ data class TrackItem(
     val durationMs: Long,
     val uri: String = "",
     val albumArtUri: String? = null,
-    val isFavorite: Boolean = false
+    val isFavorite: Boolean = false,
+    val lyrics: String? = null
 )
 
 data class VideoItem(

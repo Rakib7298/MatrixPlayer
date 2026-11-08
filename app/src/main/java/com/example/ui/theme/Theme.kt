@@ -8,10 +8,11 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
-enum class MatrixThemeMode {
-    MIDNIGHT_NEON,
-    AQUA_LIQUID_GLASS,
-    DYNAMIC_ALBUM_ART
+enum class MatrixThemeMode(val label: String, val subtitle: String) {
+    MIDNIGHT_NEON("Midnight Neon", "Cyberpunk electric cyan & neon purple glow"),
+    AQUA_LIQUID_GLASS("Aqua Liquid Glass", "Deep ocean cyan, translucent teal & aquatic flow"),
+    DYNAMIC_ALBUM_ART("Dynamic Album Art", "Warm sunset magenta, solar amber & obsidian glow"),
+    MATRIX_CYBER_GREEN("Matrix Cyber Green", "High-contrast digital emerald & cyber terminal dark")
 }
 
 data class MatrixThemeColors(
@@ -74,6 +75,30 @@ private val AquaColorScheme = darkColorScheme(
     outline = RefAquaGlassBorder
 )
 
+private val DynamicAlbumArtColorScheme = darkColorScheme(
+    primary = Color(0xFFF472B6),
+    onPrimary = Color(0xFF0D0B14),
+    secondary = Color(0xFFFB923C),
+    background = Color(0xFF0D0B14),
+    onBackground = Color.White,
+    surface = Color(0xFF1C1924),
+    onSurface = Color.White,
+    surfaceVariant = Color(0xFF282333),
+    outline = Color(0xFF3B334C)
+)
+
+private val CyberGreenColorScheme = darkColorScheme(
+    primary = Color(0xFF00FF66),
+    onPrimary = Color(0xFF05100A),
+    secondary = Color(0xFF10B981),
+    background = Color(0xFF05100A),
+    onBackground = Color.White,
+    surface = Color(0xFF0A1F14),
+    onSurface = Color.White,
+    surfaceVariant = Color(0xFF122E1F),
+    outline = Color(0xFF1B4D33)
+)
+
 @Composable
 fun MatrixPlayerTheme(
     themeMode: MatrixThemeMode = MatrixThemeMode.MIDNIGHT_NEON,
@@ -81,6 +106,8 @@ fun MatrixPlayerTheme(
 ) {
     val colorScheme = when (themeMode) {
         MatrixThemeMode.AQUA_LIQUID_GLASS -> AquaColorScheme
+        MatrixThemeMode.DYNAMIC_ALBUM_ART -> DynamicAlbumArtColorScheme
+        MatrixThemeMode.MATRIX_CYBER_GREEN -> CyberGreenColorScheme
         else -> MidnightColorScheme
     }
 
@@ -121,17 +148,33 @@ fun MatrixPlayerTheme(
             primaryGradient = Brush.horizontalGradient(listOf(Color(0xFFE879F9), Color(0xFFFB923C))),
             accentGlow = Color(0xFFF472B6),
             secondaryGlow = Color(0xFFFB923C),
-            glassCardBackground = Color(0xFF18181B),
-            glassBorder = Color(0xFF27272A),
-            backgroundDeep = Color(0xFF09090B),
-            backgroundSurface = Color(0xFF18181B),
-            textPrimary = RefTextWhite,
-            textSecondary = Color(0xFFA1A1AA),
-            textMuted = Color(0xFF71717A),
-            sliderTrack = Color(0xFF27272A),
+            glassCardBackground = Color(0xFF1C1924),
+            glassBorder = Color(0xFF3B334C),
+            backgroundDeep = Color(0xFF0D0B14),
+            backgroundSurface = Color(0xFF1C1924),
+            textPrimary = Color.White,
+            textSecondary = Color(0xFFD4D4D8),
+            textMuted = Color(0xFFA1A1AA),
+            sliderTrack = Color(0xFF282333),
             progressRingGlow = Color(0xFFF472B6),
             waveformActive = Color(0xFFF472B6),
             waveformInactive = Color(0x40F472B6)
+        )
+        MatrixThemeMode.MATRIX_CYBER_GREEN -> MatrixThemeColors(
+            primaryGradient = Brush.horizontalGradient(listOf(Color(0xFF00FF66), Color(0xFF10B981))),
+            accentGlow = Color(0xFF00FF66),
+            secondaryGlow = Color(0xFF10B981),
+            glassCardBackground = Color(0xFF0A1F14),
+            glassBorder = Color(0xFF1B4D33),
+            backgroundDeep = Color(0xFF05100A),
+            backgroundSurface = Color(0xFF0A1F14),
+            textPrimary = Color.White,
+            textSecondary = Color(0xFFA7F3D0),
+            textMuted = Color(0xFF6EE7B7),
+            sliderTrack = Color(0xFF122E1F),
+            progressRingGlow = Color(0xFF00FF66),
+            waveformActive = Color(0xFF00FF66),
+            waveformInactive = Color(0x4000FF66)
         )
     }
 

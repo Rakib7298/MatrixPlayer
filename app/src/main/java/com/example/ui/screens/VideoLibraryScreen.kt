@@ -57,6 +57,7 @@ import com.example.model.MediaSortOption
 import com.example.model.VideoItem
 import com.example.ui.components.CrystalGlassCard
 import com.example.ui.components.MatrixTopAppBar
+import com.example.ui.components.VideoThumbnailView
 import com.example.ui.navigation.Screen
 import com.example.ui.theme.LocalMatrixColors
 
@@ -301,22 +302,26 @@ fun VideoLibraryScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(110.dp)
-                                    .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
-                                    .background(colors.primaryGradient),
+                                    .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp)),
                                 contentAlignment = Alignment.Center
                             ) {
+                                VideoThumbnailView(
+                                    uri = video.uri,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+
                                 Box(
                                     modifier = Modifier
-                                        .size(42.dp)
+                                        .size(38.dp)
                                         .clip(CircleShape)
-                                        .background(Color.Black.copy(alpha = 0.65f)),
+                                        .background(Color.Black.copy(alpha = 0.55f)),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.PlayArrow,
                                         contentDescription = "Play Video",
                                         tint = colors.accentGlow,
-                                        modifier = Modifier.size(28.dp)
+                                        modifier = Modifier.size(24.dp)
                                     )
                                 }
 
@@ -383,17 +388,29 @@ fun VideoLibraryScreen(
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(60.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(colors.primaryGradient),
+                                    .size(68.dp)
+                                    .clip(RoundedCornerShape(12.dp)),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.PlayArrow,
-                                    contentDescription = "Play Video",
-                                    tint = colors.accentGlow,
-                                    modifier = Modifier.size(32.dp)
+                                VideoThumbnailView(
+                                    uri = video.uri,
+                                    modifier = Modifier.fillMaxSize()
                                 )
+
+                                Box(
+                                    modifier = Modifier
+                                        .size(28.dp)
+                                        .clip(CircleShape)
+                                        .background(Color.Black.copy(alpha = 0.6f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.PlayArrow,
+                                        contentDescription = "Play Video",
+                                        tint = colors.accentGlow,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
                             }
 
                             Spacer(modifier = Modifier.width(14.dp))

@@ -3,6 +3,6 @@
     <item
         android:width="66dp"
         android:height="66dp"
-        android:drawable="@drawable/ic_matrix_player_1793991403061"
+        android:drawable="@drawable/ic_liquid_glass_player_1794151897119"
         android:gravity="center" />
 </layer-list>

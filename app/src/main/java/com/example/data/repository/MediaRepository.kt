@@ -130,7 +130,8 @@ class MediaRepository(
                     durationMs = it.durationMs,
                     uri = it.uri,
                     isVideo = false,
-                    isFavorite = it.isFavorite
+                    isFavorite = it.isFavorite,
+                    lyrics = it.lyrics
                 )
             }
             val videoEntities = initialVideos.map {
@@ -158,7 +159,8 @@ class MediaRepository(
         durationMs = durationMs,
         uri = uri,
         albumArtUri = albumArtUri,
-        isFavorite = isFavorite
+        isFavorite = isFavorite,
+        lyrics = lyrics
     )
 
     private fun MediaItemEntity.toVideoItem() = VideoItem(

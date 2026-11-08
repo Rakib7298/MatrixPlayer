@@ -194,10 +194,11 @@ fun MatrixAppContent(
                             )
                         }
 
-                        // Glass Bottom Navigation Bar
+                        // Liquid Glass Bottom Navigation Bar with Poster Reflection Optics
                         MatrixBottomNavBar(
                             currentRoute = currentScreen.route,
-                            onNavigate = { screen -> navigateTo(screen) }
+                            onNavigate = { screen -> navigateTo(screen) },
+                            activeMediaTitle = uiState.currentTrack?.title
                         )
                     }
                 }
@@ -273,19 +274,24 @@ fun MatrixAppContent(
                             onBack = { popBack() }
                         )
 
-                        Screen.FullScreenMusicPlayer -> FullScreenMusicPlayerScreen(
-                            uiState = uiState,
-                            reactiveFrame = viewModel.reactiveAudioFrame.collectAsStateWithLifecycle().value,
-                            onPlayPause = { viewModel.togglePlayPause() },
-                            onNext = { viewModel.nextTrack() },
-                            onPrevious = { viewModel.previousTrack() },
-                            onSeek = { pos -> viewModel.seekTo(pos) },
-                            onToggleShuffle = { viewModel.toggleShuffle() },
-                            onToggleRepeat = { viewModel.toggleRepeat() },
-                            onToggleFavorite = { viewModel.toggleFavorite() },
-                            onNavigate = { s -> navigateTo(s) },
-                            onBack = { popBack() }
-                        )
+                        Screen.FullScreenMusicPlayer -> {
+                            val isGeneratingLyrics by viewModel.isGeneratingLyrics.collectAsStateWithLifecycle()
+                            FullScreenMusicPlayerScreen(
+                                uiState = uiState,
+                                reactiveFrame = viewModel.reactiveAudioFrame.collectAsStateWithLifecycle().value,
+                                isGeneratingLyrics = isGeneratingLyrics,
+                                onGenerateLyrics = { viewModel.generateLyricsForCurrentTrack() },
+                                onPlayPause = { viewModel.togglePlayPause() },
+                                onNext = { viewModel.nextTrack() },
+                                onPrevious = { viewModel.previousTrack() },
+                                onSeek = { pos -> viewModel.seekTo(pos) },
+                                onToggleShuffle = { viewModel.toggleShuffle() },
+                                onToggleRepeat = { viewModel.toggleRepeat() },
+                                onToggleFavorite = { viewModel.toggleFavorite() },
+                                onNavigate = { s -> navigateTo(s) },
+                                onBack = { popBack() }
+                            )
+                        }
 
                         Screen.VisualizerStudio -> VisualizerStudioScreen(
                             selectedIndex = uiState.selectedVisualizerIndex,

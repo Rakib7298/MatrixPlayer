@@ -137,7 +137,25 @@ fun SettingsScreen(
                             )
                             Column(modifier = Modifier.padding(start = 8.dp)) {
                                 Text("3. Dynamic Album Art", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
-                                Text("Dynamic sunset purples and vibrant orange hues", style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
+                                Text("Sunset magenta, warm amber & deep obsidian glow", style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onSelectTheme(MatrixThemeMode.MATRIX_CYBER_GREEN) }
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = currentTheme == MatrixThemeMode.MATRIX_CYBER_GREEN,
+                                onClick = { onSelectTheme(MatrixThemeMode.MATRIX_CYBER_GREEN) },
+                                colors = RadioButtonDefaults.colors(selectedColor = colors.accentGlow)
+                            )
+                            Column(modifier = Modifier.padding(start = 8.dp)) {
+                                Text("4. Matrix Cyber Green", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
+                                Text("Digital emerald & cyber terminal dark", style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
                             }
                         }
                     }

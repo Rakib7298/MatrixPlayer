@@ -56,6 +56,10 @@ class MatrixPlayerViewModel(application: Application) : AndroidViewModel(applica
     val healthCheckerEngine = com.example.media.streaming.LinkHealthCheckerEngine(application)
     val autoSyncEngine = com.example.media.sync.AutoMediaSyncEngine(application, database, scanner)
     val universalStreamImportEngine = com.example.media.streaming.UniversalStreamImportEngine(application, repository, healthCheckerEngine)
+    val lyricsEngine = com.example.media.lyrics.GeminiLyricsGeneratorEngine(application, repository)
+
+    private val _isGeneratingLyrics = MutableStateFlow(false)
+    val isGeneratingLyrics: StateFlow<Boolean> = _isGeneratingLyrics.asStateFlow()
 
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
@@ -352,6 +356,35 @@ class MatrixPlayerViewModel(application: Application) : AndroidViewModel(applica
     fun playVideo(video: VideoItem) {
         _uiState.value = _uiState.value.copy(currentVideo = video)
         videoEngine.prepareAndPlay(video.uriString, video.title)
+    }
+
+    fun generateLyricsForCurrentTrack() {
+        val track = _uiState.value.currentTrack ?: return
+        viewModelScope.launch {
+            _isGeneratingLyrics.value = true
+            try {
+                val result = lyricsEngine.generateLyrics(track)
+                val generatedLyrics = result.getOrNull()
+                if (!generatedLyrics.isNullOrBlank()) {
+                    val updatedTrack = track.copy(lyrics = generatedLyrics)
+                    _uiState.value = _uiState.value.copy(currentTrack = updatedTrack)
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("MatrixPlayerViewModel", "Error generating lyrics: ${e.message}", e)
+            } finally {
+                _isGeneratingLyrics.value = false
+            }
+        }
+    }
+
+    fun updateTrackLyrics(trackId: String, lyrics: String) {
+        viewModelScope.launch {
+            repository.updateLyrics(trackId, lyrics)
+            if (_uiState.value.currentTrack?.id == trackId) {
+                val updated = _uiState.value.currentTrack?.copy(lyrics = lyrics)
+                _uiState.value = _uiState.value.copy(currentTrack = updated)
+            }
+        }
     }
 
     override fun onCleared() {

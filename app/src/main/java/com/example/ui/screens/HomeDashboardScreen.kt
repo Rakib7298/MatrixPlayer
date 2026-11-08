@@ -126,11 +126,6 @@ fun HomeDashboardScreen(
                             ),
                             color = colors.textPrimary
                         )
-                        Text(
-                            text = "Crystal Liquid Audio & Video",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = colors.accentGlow
-                        )
                     }
 
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
