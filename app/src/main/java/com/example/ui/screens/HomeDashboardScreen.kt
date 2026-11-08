@@ -36,6 +36,8 @@ import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Subtitles
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.Icon
@@ -89,6 +91,8 @@ fun HomeDashboardScreen(
         QuickAction("Albums", Icons.Default.Album, Screen.Albums, Color(0xFF00B0FF)),
         QuickAction("Artists", Icons.Default.Person, Screen.Artists, Color(0xFFE040FB)),
         QuickAction("Subtitles", Icons.Default.Subtitles, Screen.SubtitleManager, Color(0xFF69F0AE)),
+        QuickAction("Auto Sync", Icons.Default.Sync, Screen.MediaSyncHub, Color(0xFF00F0FF)),
+        QuickAction("Stream Import", Icons.Default.CloudDownload, Screen.UniversalStreamImport, Color(0xFF1DE9B6)),
         QuickAction("GitHub M3U", Icons.Default.Code, Screen.GitHubPlaylists, Color(0xFF6E40C9)),
         QuickAction("AI Chat", Icons.Default.AutoAwesome, Screen.AiChat, Color(0xFF00F0FF)),
         QuickAction("Link Health", Icons.Default.Sensors, Screen.LinkHealthChecker, Color(0xFF10B981))

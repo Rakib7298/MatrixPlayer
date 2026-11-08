@@ -356,4 +356,63 @@ class MatrixPlayerPureUnitTest {
         assertEquals(com.example.media.ai.MessageSender.ASSISTANT, msg.sender)
         assertEquals("gemini-3.8-flash", msg.modelName)
     }
+
+    @Test
+    fun autoMediaSyncModels_folderInfoAndReportCalculations() {
+        val folder = com.example.media.sync.SyncFolderInfo(
+            name = "Music",
+            path = "/storage/emulated/0/Music",
+            audioCount = 42,
+            videoCount = 8,
+            totalSizeBytes = 1024L * 1024L * 250L // 250 MB
+        )
+        assertEquals(50, folder.totalMediaCount)
+        assertTrue(folder.totalSizeMbText.contains("250.0 MB"))
+
+        val largeFolder = com.example.media.sync.SyncFolderInfo(
+            name = "Movies",
+            path = "/storage/emulated/0/Movies",
+            audioCount = 0,
+            videoCount = 4,
+            totalSizeBytes = 1024L * 1024L * 1024L * 3L // 3 GB
+        )
+        assertTrue(largeFolder.totalSizeMbText.contains("3.00 GB"))
+
+        val report = com.example.media.sync.AutoSyncReport(
+            status = com.example.media.sync.MediaSyncStatus.COMPLETED,
+            totalAudioCount = 120,
+            totalVideoCount = 35,
+            totalMediaSizeBytes = 1024L * 1024L * 1024L * 2L,
+            lastSyncTimestamp = System.currentTimeMillis(),
+            foldersSummary = listOf(folder, largeFolder)
+        )
+        assertEquals(155, report.totalMediaCount)
+        assertTrue(report.totalSizeText.contains("2.00 GB"))
+        assertEquals(com.example.media.sync.MediaSyncStatus.COMPLETED, report.status)
+    }
+
+    @Test
+    fun universalStreamImport_discoveredPlaylistsAndRepoScanResult() {
+        val discovered = com.example.media.streaming.DiscoveredRepoPlaylist(
+            path = "streams/synthwave.m3u8",
+            name = "synthwave.m3u8",
+            rawDownloadUrl = "https://raw.githubusercontent.com/matrix/playlists/main/streams/synthwave.m3u8",
+            sizeBytes = 145000L
+        )
+        assertEquals("synthwave.m3u8", discovered.name)
+        assertEquals("streams/synthwave.m3u8", discovered.path)
+
+        val scanResult = com.example.media.streaming.GitHubRepoScanResult(
+            owner = "iptv-org",
+            repo = "iptv",
+            branch = "master",
+            totalFilesFound = 1,
+            playlists = listOf(discovered),
+            isFallback = false
+        )
+        assertEquals("iptv-org", scanResult.owner)
+        assertEquals("iptv", scanResult.repo)
+        assertEquals(1, scanResult.totalFilesFound)
+        assertFalse(scanResult.isFallback)
+    }
 }

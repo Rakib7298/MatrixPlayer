@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.AddLink
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.PlayArrow
@@ -87,6 +88,7 @@ fun StreamingSourcesScreen(
     onPlayStation: (StreamStation) -> Unit,
     onNavigateToGitHub: () -> Unit = {},
     onNavigateToHealthChecker: () -> Unit = {},
+    onNavigateToUniversalImport: () -> Unit = {},
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -135,7 +137,16 @@ fun StreamingSourcesScreen(
     ) {
         MatrixTopAppBar(
             title = "Streaming & Live Stations",
-            onBackClick = onBack
+            onBackClick = onBack,
+            actions = {
+                IconButton(onClick = onNavigateToUniversalImport) {
+                    Icon(
+                        imageVector = Icons.Default.CloudDownload,
+                        contentDescription = "Universal Stream Importer",
+                        tint = colors.accentGlow
+                    )
+                }
+            }
         )
 
         LazyColumn(

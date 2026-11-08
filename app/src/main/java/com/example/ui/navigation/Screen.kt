@@ -22,4 +22,6 @@ sealed class Screen(val route: String, val title: String) {
     object GitHubPlaylists : Screen("github_playlists", "GitHub Playlists")
     object AiChat : Screen("ai_chat", "Matrix AI Chat")
     object LinkHealthChecker : Screen("link_health_checker", "Link Health")
+    object MediaSyncHub : Screen("media_sync_hub", "Auto Media Sync")
+    object UniversalStreamImport : Screen("stream_import", "Stream & Repo Importer")
 }

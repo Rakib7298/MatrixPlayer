@@ -54,6 +54,8 @@ class MatrixPlayerViewModel(application: Application) : AndroidViewModel(applica
     val gitHubPlaylistManager = com.example.media.github.GitHubPlaylistManager(application, viewModelScope)
     val aiEngine = com.example.media.ai.MatrixAiChatEngine(application, viewModelScope)
     val healthCheckerEngine = com.example.media.streaming.LinkHealthCheckerEngine(application)
+    val autoSyncEngine = com.example.media.sync.AutoMediaSyncEngine(application, database, scanner)
+    val universalStreamImportEngine = com.example.media.streaming.UniversalStreamImportEngine(application, repository, healthCheckerEngine)
 
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
@@ -354,6 +356,7 @@ class MatrixPlayerViewModel(application: Application) : AndroidViewModel(applica
 
     override fun onCleared() {
         super.onCleared()
+        autoSyncEngine.release()
         playbackManager.release()
         effectManager.release()
         visualizerEngine.release()

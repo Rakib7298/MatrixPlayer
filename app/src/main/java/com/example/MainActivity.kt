@@ -47,11 +47,15 @@ import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.SplashScreen
 import com.example.ui.screens.StreamingSourcesScreen
 import com.example.ui.screens.SubtitleManagerScreen
+import com.example.ui.screens.MediaSyncHubScreen
+import com.example.ui.screens.UniversalStreamImportScreen
 import com.example.ui.screens.VideoLibraryScreen
 import com.example.ui.screens.VisualizerStudioScreen
 import com.example.ui.theme.MatrixPlayerTheme
 import com.example.util.configureAppCheck
 import com.example.viewmodel.MatrixPlayerViewModel
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 
 import android.Manifest
 import android.os.Build
@@ -61,15 +65,30 @@ class MainActivity : ComponentActivity() {
 
     private val viewModel: MatrixPlayerViewModel by viewModels()
 
+    private val folderPickerLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        if (uri != null) {
+            viewModel.autoSyncEngine.addCustomFolder(uri)
+        }
+    }
+
+    private val filePickerLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            lifecycleScope.launch {
+                viewModel.universalStreamImportEngine.parseFromLocalUri(uri)
+            }
+        }
+    }
+
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        val recordAudioGranted = permissions[Manifest.permission.RECORD_AUDIO] ?: false
-        if (recordAudioGranted) {
-            // Re-check visualizer session if granted
-            viewModel.uiState.value.let { state ->
-                // Audio session will automatically attach if active
-            }
+        val audioGranted = permissions[Manifest.permission.READ_MEDIA_AUDIO] ?: permissions[Manifest.permission.READ_EXTERNAL_STORAGE] ?: false
+        if (audioGranted) {
+            viewModel.autoSyncEngine.triggerSyncNow()
         }
     }
 
@@ -80,7 +99,11 @@ class MainActivity : ComponentActivity() {
 
         val permsToRequest = mutableListOf(Manifest.permission.RECORD_AUDIO)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permsToRequest.add(Manifest.permission.READ_MEDIA_AUDIO)
+            permsToRequest.add(Manifest.permission.READ_MEDIA_VIDEO)
             permsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            permsToRequest.add(Manifest.permission.READ_EXTERNAL_STORAGE)
         }
         permissionLauncher.launch(permsToRequest.toTypedArray())
 
@@ -88,14 +111,22 @@ class MainActivity : ComponentActivity() {
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
             MatrixPlayerTheme(themeMode = uiState.currentTheme) {
-                MatrixAppContent(viewModel = viewModel)
+                MatrixAppContent(
+                    viewModel = viewModel,
+                    onLaunchFolderPicker = { folderPickerLauncher.launch(null) },
+                    onLaunchFilePicker = { filePickerLauncher.launch(arrayOf("*/*")) }
+                )
             }
         }
     }
 }
 
 @Composable
-fun MatrixAppContent(viewModel: MatrixPlayerViewModel) {
+fun MatrixAppContent(
+    viewModel: MatrixPlayerViewModel,
+    onLaunchFolderPicker: () -> Unit = {},
+    onLaunchFilePicker: () -> Unit = {}
+) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val tracks by viewModel.roomTracks.collectAsStateWithLifecycle()
     val videos by viewModel.roomVideos.collectAsStateWithLifecycle()
@@ -302,6 +333,7 @@ fun MatrixAppContent(viewModel: MatrixPlayerViewModel) {
                             onPlayStation = { station -> viewModel.playStreamStation(station) },
                             onNavigateToGitHub = { navigateTo(Screen.GitHubPlaylists) },
                             onNavigateToHealthChecker = { navigateTo(Screen.LinkHealthChecker) },
+                            onNavigateToUniversalImport = { navigateTo(Screen.UniversalStreamImport) },
                             onBack = { popBack() }
                         )
 
@@ -323,6 +355,22 @@ fun MatrixAppContent(viewModel: MatrixPlayerViewModel) {
                             checkerEngine = viewModel.healthCheckerEngine,
                             repository = viewModel.repository,
                             onPlayTrack = { track -> viewModel.playTrack(track) },
+                            onBack = { popBack() }
+                        )
+
+                        Screen.MediaSyncHub -> MediaSyncHubScreen(
+                            syncEngine = viewModel.autoSyncEngine,
+                            onLaunchFolderPicker = onLaunchFolderPicker,
+                            onBack = { popBack() }
+                        )
+
+                        Screen.UniversalStreamImport -> UniversalStreamImportScreen(
+                            importEngine = viewModel.universalStreamImportEngine,
+                            onPlayTrack = { track ->
+                                viewModel.playTrack(track)
+                                navigateTo(Screen.FullScreenMusicPlayer)
+                            },
+                            onLaunchFilePicker = onLaunchFilePicker,
                             onBack = { popBack() }
                         )
 

@@ -16,6 +16,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -207,6 +209,66 @@ fun SettingsScreen(
                                 colors = SwitchDefaults.colors(checkedThumbColor = colors.backgroundDeep, checkedTrackColor = colors.accentGlow)
                             )
                         }
+                    }
+                }
+            }
+
+            // Storage & Streaming Sync Navigation
+            item {
+                Text(
+                    text = "MEDIA STORAGE & STREAMING SYNC",
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                    color = colors.textSecondary,
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                CrystalGlassCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onNavigate(Screen.MediaSyncHub) },
+                    shape = RoundedCornerShape(20.dp),
+                    backgroundColor = colors.backgroundSurface.copy(alpha = 0.8f),
+                    borderColor = colors.glassBorder
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("Auto Media Synchronized System", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = colors.textPrimary)
+                            Text("Automatic MediaStore crawler & custom SAF directory monitor", style = MaterialTheme.typography.bodySmall, color = colors.accentGlow)
+                        }
+                        Icon(Icons.Default.Sync, contentDescription = null, tint = colors.accentGlow)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                CrystalGlassCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onNavigate(Screen.UniversalStreamImport) },
+                    shape = RoundedCornerShape(20.dp),
+                    backgroundColor = colors.backgroundSurface.copy(alpha = 0.8f),
+                    borderColor = colors.glassBorder
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("Universal Stream & Repo Importer", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = colors.textPrimary)
+                            Text("M3U / M3U8 URLs, local playlist files & GitHub repository scanner", style = MaterialTheme.typography.bodySmall, color = colors.accentGlow)
+                        }
+                        Icon(Icons.Default.CloudDownload, contentDescription = null, tint = colors.accentGlow)
                     }
                 }
             }
