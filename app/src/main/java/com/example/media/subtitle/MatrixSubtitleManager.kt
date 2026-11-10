@@ -71,8 +71,9 @@ class MatrixSubtitleManager(private val context: Context) {
             লবলেস অ্যাকোস্টিক ফিডেলিটি এবং ক্রিস্টাল ভিজ্যুয়ালাইজার উপভোগ করুন।
         """.trimIndent()
 
-        _upperCues.value = SubtitleParser.parseSrtOrVtt(defaultEnglishSrt)
-        _lowerCues.value = SubtitleParser.parseSrtOrVtt(defaultBengaliSrt)
+        // Initialize empty by default so video playback is clean without blocking text
+        _upperCues.value = emptyList()
+        _lowerCues.value = emptyList()
 
         // Seed online search catalog
         _onlineResults.value = listOf(

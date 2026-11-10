@@ -10,6 +10,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -23,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -61,12 +63,17 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 
 import android.Manifest
+import android.app.PictureInPictureParams
+import android.content.res.Configuration
 import android.os.Build
+import android.util.Rational
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.mutableStateOf
 
 class MainActivity : ComponentActivity() {
 
     private val viewModel: MatrixPlayerViewModel by viewModels()
+    private val isInPipModeState = mutableStateOf(false)
 
     private val folderPickerLauncher = registerForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
@@ -95,6 +102,64 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    fun enterVideoPipMode() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val videoSize = viewModel.videoEngine.player.videoSize
+            val aspect = if (videoSize.width > 0 && videoSize.height > 0) {
+                val ratio = videoSize.width.toFloat() / videoSize.height.toFloat()
+                if (ratio in 0.42f..2.38f) {
+                    Rational(videoSize.width, videoSize.height)
+                } else {
+                    Rational(16, 9)
+                }
+            } else {
+                Rational(16, 9)
+            }
+            val builder = PictureInPictureParams.Builder()
+                .setAspectRatio(aspect)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                builder.setAutoEnterEnabled(true)
+            }
+            try {
+                enterPictureInPictureMode(builder.build())
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun enterMusicPipMode() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val builder = PictureInPictureParams.Builder()
+                .setAspectRatio(Rational(1, 1))
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                builder.setAutoEnterEnabled(true)
+            }
+            try {
+                enterPictureInPictureMode(builder.build())
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (viewModel.videoEngine.videoState.value.isPlaying) {
+            enterVideoPipMode()
+        } else if (viewModel.uiState.value.isPlaying) {
+            enterMusicPipMode()
+        }
+    }
+
+    override fun onPictureInPictureModeChanged(
+        isInPictureInPictureMode: Boolean,
+        newConfig: Configuration
+    ) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        isInPipModeState.value = isInPictureInPictureMode
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         configureAppCheck(this, intent)
@@ -116,6 +181,9 @@ class MainActivity : ComponentActivity() {
             MatrixPlayerTheme(themeMode = uiState.currentTheme) {
                 MatrixAppContent(
                     viewModel = viewModel,
+                    isInPipMode = isInPipModeState.value,
+                    onEnterVideoPip = { enterVideoPipMode() },
+                    onEnterMusicPip = { enterMusicPipMode() },
                     onLaunchFolderPicker = { folderPickerLauncher.launch(null) },
                     onLaunchFilePicker = { filePickerLauncher.launch(arrayOf("*/*")) }
                 )
@@ -127,6 +195,9 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MatrixAppContent(
     viewModel: MatrixPlayerViewModel,
+    isInPipMode: Boolean = false,
+    onEnterVideoPip: () -> Unit = {},
+    onEnterMusicPip: () -> Unit = {},
     onLaunchFolderPicker: () -> Unit = {},
     onLaunchFilePicker: () -> Unit = {}
 ) {
@@ -186,11 +257,53 @@ fun MatrixAppContent(
     val isFullScreenPlayback = currentScreen == Screen.FullScreenMusicPlayer || currentScreen == Screen.FullScreenVideoPlayer
     val isSplash = currentScreen == Screen.Splash
 
-    MatrixBackground {
-        Scaffold(
-            modifier = Modifier.fillMaxSize(),
-            containerColor = Color.Transparent,
-            contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
+    if (isInPipMode) {
+        val videoState by viewModel.videoEngine.videoState.collectAsStateWithLifecycle()
+        if (videoState.isPlaying || currentScreen == Screen.FullScreenVideoPlayer) {
+            FullScreenVideoPlayerScreen(
+                video = uiState.currentVideo ?: videos.firstOrNull(),
+                videoEngine = viewModel.videoEngine,
+                subtitleManager = viewModel.subtitleManager,
+                isInPipMode = true,
+                onEnterPip = onEnterVideoPip,
+                onNavigate = { s -> navigateTo(s) },
+                onBack = { popBack() }
+            )
+        } else {
+            // Reference image style aqua liquid glass music widget filling the PiP window!
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                Color(0xFF063F61),
+                                Color(0xFF032840),
+                                Color(0xFF021B2B)
+                            )
+                        )
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                com.example.ui.components.AquaLiquidGlassFloatingCard(
+                    track = uiState.currentTrack ?: tracks.firstOrNull(),
+                    isPlaying = uiState.isPlaying,
+                    currentPositionMs = uiState.currentPositionMs,
+                    durationMs = uiState.durationMs,
+                    onPlayPause = { viewModel.togglePlayPause() },
+                    onNext = { viewModel.nextTrack() },
+                    onPrevious = { viewModel.previousTrack() },
+                    onClickCard = {},
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+        }
+    } else {
+        MatrixBackground {
+            Scaffold(
+                modifier = Modifier.fillMaxSize(),
+                containerColor = Color.Transparent,
+                contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
             bottomBar = {
                 if (!isSplash && !isFullScreenPlayback) {
                     androidx.compose.foundation.layout.Column {
@@ -253,6 +366,7 @@ fun MatrixAppContent(
                             videos = videos,
                             history = history,
                             stations = stations,
+                            reactiveFrame = viewModel.reactiveAudioFrame.collectAsStateWithLifecycle().value,
                             onTrackClick = { track ->
                                 viewModel.playTrack(track)
                             },
@@ -358,6 +472,8 @@ fun MatrixAppContent(
                             video = uiState.currentVideo ?: videos.firstOrNull(),
                             videoEngine = viewModel.videoEngine,
                             subtitleManager = viewModel.subtitleManager,
+                            isInPipMode = false,
+                            onEnterPip = onEnterVideoPip,
                             onNavigate = { s -> navigateTo(s) },
                             onBack = { popBack() }
                         )
@@ -440,4 +556,5 @@ fun MatrixAppContent(
             }
         }
     }
+}
 }

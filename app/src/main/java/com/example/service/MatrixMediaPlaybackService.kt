@@ -32,6 +32,9 @@ class MatrixMediaPlaybackService : MediaSessionService() {
         const val CHANNEL_ID = "matrix_audio_playback_channel"
         const val NOTIFICATION_ID = 1001
 
+        const val ACTION_PLAY_PAUSE = "com.example.ACTION_PLAY_PAUSE"
+        const val ACTION_NEXT = "com.example.ACTION_NEXT"
+        const val ACTION_PREVIOUS = "com.example.ACTION_PREVIOUS"
         const val ACTION_FAVORITE = "com.matrix.player.ACTION_FAVORITE"
         const val ACTION_SHUFFLE = "com.matrix.player.ACTION_SHUFFLE"
         const val ACTION_REPEAT = "com.matrix.player.ACTION_REPEAT"
@@ -55,6 +58,20 @@ class MatrixMediaPlaybackService : MediaSessionService() {
             .setHandleAudioBecomingNoisy(true) // Automatically pauses when headphones/Bluetooth disconnects
             .setWakeMode(C.WAKE_MODE_LOCAL) // Keeps playback running smoothly when screen is off
             .build()
+
+        player.addListener(object : Player.Listener {
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                updateWidget()
+            }
+
+            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                updateWidget()
+            }
+
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                updateWidget()
+            }
+        })
 
         // PendingIntent to launch app on notification or lock-screen tap
         val intent = Intent(this, MainActivity::class.java).apply {
@@ -145,8 +162,44 @@ class MatrixMediaPlaybackService : MediaSessionService() {
         }
     }
 
+    private fun updateWidget() {
+        val currentItem = player.currentMediaItem
+        val title = currentItem?.mediaMetadata?.title?.toString()
+        val artist = currentItem?.mediaMetadata?.artist?.toString()
+        val isPlaying = player.isPlaying
+        val pos = player.currentPosition
+        val dur = player.duration.coerceAtLeast(0L)
+
+        com.example.widget.MatrixMusicWidgetProvider.updateAllWidgets(
+            this,
+            title,
+            artist,
+            isPlaying,
+            pos,
+            dur
+        )
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
+        when (intent?.action) {
+            ACTION_PLAY_PAUSE -> {
+                if (player.isPlaying) player.pause() else player.play()
+                updateWidget()
+            }
+            ACTION_NEXT -> {
+                if (player.hasNextMediaItem()) {
+                    player.seekToNextMediaItem()
+                }
+                updateWidget()
+            }
+            ACTION_PREVIOUS -> {
+                if (player.hasPreviousMediaItem()) {
+                    player.seekToPreviousMediaItem()
+                }
+                updateWidget()
+            }
+        }
         return START_STICKY
     }
 

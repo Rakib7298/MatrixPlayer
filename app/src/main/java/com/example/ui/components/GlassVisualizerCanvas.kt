@@ -74,6 +74,8 @@ fun RealtimeGlassVisualizer(
         contentAlignment = Alignment.Center
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
+            if (size.width <= 0f || size.height <= 0f) return@Canvas
+
             val t = animTime.value
             val waveData = reactiveFrame.waveform
             val fftData = reactiveFrame.fftMagnitudes
@@ -85,12 +87,14 @@ fun RealtimeGlassVisualizer(
                     val barCount = 42
                     val spacing = size.width / barCount
                     val barWidth = (spacing * 0.55f).coerceAtLeast(2f)
+                    val maxBarH = (size.height * 0.95f).coerceAtLeast(1f)
+                    val minBarH = 4f.coerceAtMost(maxBarH)
 
                     for (i in 0 until barCount) {
                         val fftMag = fftData.getOrElse(i % fftData.size) { 0.2f }
                         val simVal = if (isPlaying) (sin(i * 0.25 + t * 0.1) * 0.35 + 0.45).toFloat() else 0.15f
                         val rawMag = if (reactiveFrame.isHardwareDriven) fftMag else simVal
-                        val barHeight = (size.height * 0.85f * rawMag).coerceIn(4f, size.height * 0.95f)
+                        val barHeight = (size.height * 0.85f * rawMag).coerceIn(minBarH, maxBarH)
 
                         val x = i * spacing + (spacing - barWidth) / 2f
                         val y = (size.height - barHeight) / 2f

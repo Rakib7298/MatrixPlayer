@@ -145,6 +145,8 @@ fun VisualizerStudioScreen(
             val fftData = reactiveFrame.fftMagnitudes
 
             Canvas(modifier = Modifier.fillMaxSize()) {
+                if (size.width <= 0f || size.height <= 0f) return@Canvas
+
                 val cx = size.width / 2
                 val cy = size.height / 2
 
@@ -173,9 +175,11 @@ fun VisualizerStudioScreen(
                     1 -> { // 2. Spectrum Bars
                         val bars = 32
                         val barWidth = size.width / (bars * 1.5f)
+                        val maxBarH = (size.height * 0.8f).coerceAtLeast(1f)
+                        val minBarH = 4f.coerceAtMost(maxBarH)
                         for (i in 0 until bars) {
                             val mag = fftData.getOrElse(i) { 0.2f }
-                            val barHeight = (size.height * 0.65f * mag * sensitivity).coerceIn(4f, size.height * 0.8f)
+                            val barHeight = (size.height * 0.65f * mag * sensitivity).coerceIn(minBarH, maxBarH)
                             val x = i * (barWidth * 1.5f) + barWidth * 0.5f
                             val y = size.height - barHeight
                             drawRect(
@@ -239,9 +243,11 @@ fun VisualizerStudioScreen(
                     6 -> { // 7. Mirror Spectrum
                         val bars = 24
                         val barWidth = size.width / (bars * 2.2f)
+                        val maxH = (size.height * 0.45f).coerceAtLeast(1f)
+                        val minH = 4f.coerceAtMost(maxH)
                         for (i in 0 until bars) {
                             val mag = fftData.getOrElse(i) { 0.25f }
-                            val h = (mag * 140f * sensitivity).coerceIn(4f, size.height * 0.45f)
+                            val h = (mag * 140f * sensitivity).coerceIn(minH, maxH)
                             val xLeft = cx - (i * barWidth * 1.5f)
                             val xRight = cx + (i * barWidth * 1.5f)
                             drawLine(glowColor, Offset(xLeft, cy - h), Offset(xLeft, cy + h), strokeWidth = barWidth)

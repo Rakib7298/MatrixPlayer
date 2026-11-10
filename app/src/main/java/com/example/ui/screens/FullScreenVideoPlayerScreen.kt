@@ -1,16 +1,13 @@
 package com.example.ui.screens
 
 import android.app.Activity
+import android.content.pm.ActivityInfo
 import android.view.ViewGroup
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -43,9 +40,8 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CropFree
 import androidx.compose.material.icons.filled.Equalizer
-import androidx.compose.material.icons.filled.FastForward
-import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.Gif
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
@@ -55,23 +51,18 @@ import androidx.compose.material.icons.filled.PictureInPictureAlt
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Replay
-import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.ScreenRotation
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material.icons.filled.VolumeUp
-import androidx.compose.material.icons.filled.ZoomIn
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
-import androidx.compose.material3.TabRowDefaults
-import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -84,6 +75,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -92,7 +84,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -102,22 +96,21 @@ import androidx.media3.ui.PlayerView
 import com.example.media.video.MatrixVideoEngine
 import com.example.media.video.VideoAspectRatioMode
 import com.example.model.VideoItem
-import com.example.ui.components.MediaControlPanel
 import com.example.ui.navigation.Screen
-import com.example.ui.theme.RefBlueCyanGlow
-import com.example.ui.theme.RefPurpleLight
+import com.example.ui.theme.LocalMatrixColors
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 /**
- * Super Crystal Liquid Glass Full-Screen Video Player with 70% transparent rounded corner control panels,
- * real gestures (vertical drag left for brightness, vertical drag right for volume, double-tap 10s seek,
- * two-finger pinch-to-zoom 1x-3x), aspect ratio cycling, audio & subtitle track chooser modal, and screen lock.
- *
- * Visually cloned from reference screenshots:
- * - 5eb155e2: Landscape video player with floating capsules
- * - Screenshot_2026-11-07-00-12-18-887: Vision glass frosted player controls
- * - b35ecc5e & 1cb5f32d: Audio and Subtitle chooser modal dialog
+ * Super Crystal Liquid Glass Video Player.
+ * Cloned directly from user Reference Image 2:
+ * - 100% visible video surface (no blocking mock backdrops or opaque canvas)
+ * - Floating crystal liquid glass transparent pill control bars
+ * - Top Bar: Title on left, floating pill on right [Aspect/Loop, CC, More ⋮]
+ * - Center: Floating transparent glass pill with [Prev | Play/Pause | Next]
+ * - Bottom Bar: Progress timeline with white glowing thumb
+ *   Bottom-Left Pill: [Fit/Aspect, GIF/Screenshot]
+ *   Bottom-Right Pill: [PiP/Resize, Speed, Rotate, Lock]
+ * - Full horizontal & vertical gestures (seek, brightness, volume, double-tap 10s, pinch-to-zoom)
  */
 @OptIn(UnstableApi::class)
 @Composable
@@ -127,11 +120,75 @@ fun FullScreenVideoPlayerScreen(
     onNavigate: (Screen) -> Unit,
     onBack: () -> Unit,
     subtitleManager: com.example.media.subtitle.MatrixSubtitleManager? = null,
+    isInPipMode: Boolean = false,
+    onEnterPip: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val activity = context as? Activity
-    val scope = rememberCoroutineScope()
+    val colors = LocalMatrixColors.current
+
+    // Auto Smooth Rotate System: Detects video aspect ratio and smoothly adapts screen orientation
+    androidx.compose.runtime.DisposableEffect(videoEngine.player) {
+        val listener = object : androidx.media3.common.Player.Listener {
+            override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
+                if (videoSize.width > 0 && videoSize.height > 0) {
+                    activity?.let { act ->
+                        if (videoSize.width > videoSize.height) {
+                            if (act.requestedOrientation != ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE) {
+                                act.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                            }
+                        } else {
+                            if (act.requestedOrientation != ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT) {
+                                act.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        videoEngine.player.addListener(listener)
+
+        val curSize = videoEngine.player.videoSize
+        if (curSize.width > 0 && curSize.height > 0) {
+            activity?.let { act ->
+                if (curSize.width > curSize.height) {
+                    act.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                } else {
+                    act.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+                }
+            }
+        }
+
+        onDispose {
+            videoEngine.player.removeListener(listener)
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
+    }
+
+    // In Picture-in-Picture mode, render ONLY the full-bleed video surface without any UI controls or overlays
+    if (isInPipMode) {
+        AndroidView(
+            factory = { ctx ->
+                PlayerView(ctx).apply {
+                    player = videoEngine.player
+                    useController = false
+                    keepScreenOn = true
+                    resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+                    layoutParams = ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+                }
+            },
+            update = { view ->
+                view.player = videoEngine.player
+                view.keepScreenOn = true
+            },
+            modifier = Modifier.fillMaxSize()
+        )
+        return
+    }
 
     val videoState by videoEngine.videoState.collectAsStateWithLifecycle()
 
@@ -139,34 +196,32 @@ fun FullScreenVideoPlayerScreen(
     var showControls by remember { mutableStateOf(true) }
     var userInteracting by remember { mutableStateOf(false) }
 
-    // Gesture State: HUD indicators & Drag directions
+    // Gesture State: HUD indicators
     var hudBrightnessVisible by remember { mutableStateOf(false) }
     var hudVolumeVisible by remember { mutableStateOf(false) }
     var hudSeekVisible by remember { mutableStateOf(false) }
     var hudSeekDeltaMs by remember { mutableLongStateOf(0L) }
     var hudSeekTargetMs by remember { mutableLongStateOf(0L) }
 
-    var activeGestureDirection by remember { mutableStateOf<String?>(null) } // "SEEK", "BRIGHTNESS", "VOLUME"
+    var activeGestureDirection by remember { mutableStateOf<String?>(null) }
     var totalDragX by remember { mutableFloatStateOf(0f) }
     var totalDragY by remember { mutableFloatStateOf(0f) }
     var dragStartPosMs by remember { mutableLongStateOf(0L) }
 
     var seekBubbleText by remember { mutableStateOf<String?>(null) }
-    var seekBubbleForward by remember { mutableStateOf(true) }
 
     // Pinch-to-zoom state
     var zoomScale by remember { mutableFloatStateOf(1.0f) }
     var panOffsetX by remember { mutableFloatStateOf(0f) }
     var panOffsetY by remember { mutableFloatStateOf(0f) }
 
-    // Audio & Subtitle chooser modal
-    var showTrackChooserDialog by remember { mutableStateOf(false) }
-    var showSpeedDialog by remember { mutableStateOf(false) }
+    // Options Dialog
+    var showOptionsDialog by remember { mutableStateOf(false) }
 
-    // Auto-hide controls timer
+    // Auto-hide controls timer (3.5 seconds)
     LaunchedEffect(showControls, videoState.isPlaying, videoState.isLocked, userInteracting) {
         if (showControls && videoState.isPlaying && !videoState.isLocked && !userInteracting) {
-            delay(5000)
+            delay(3500)
             showControls = false
         }
     }
@@ -215,10 +270,7 @@ fun FullScreenVideoPlayerScreen(
             .background(Color.Black)
             .testTag("full_screen_video_player")
     ) {
-        val screenWidth = maxWidth
-        val screenHeight = maxHeight
-
-        // Base Layer: ExoPlayer Video Surface with pinch-to-zoom graphicsLayer
+        // Base Layer: Real Media3 PlayerView Video Surface (completely unblocked!)
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -229,7 +281,6 @@ fun FullScreenVideoPlayerScreen(
                     translationY = panOffsetY
                 )
         ) {
-            // Real Media3 PlayerView
             AndroidView(
                 factory = { ctx ->
                     PlayerView(ctx).apply {
@@ -257,60 +308,6 @@ fun FullScreenVideoPlayerScreen(
                 },
                 modifier = Modifier.fillMaxSize()
             )
-
-            // Scenic 4K Alpine Nature Backdrop ("Beau paysage" fallback canvas if video is buffering or local file not yet loaded)
-            Canvas(
-                modifier = Modifier.fillMaxSize()
-            ) {
-                val w = size.width
-                val h = size.height
-
-                // Golden sunset sky
-                drawRect(
-                    brush = Brush.verticalGradient(
-                        listOf(Color(0xFF38BDF8), Color(0xFFFED7AA), Color(0xFFF97316)),
-                        startY = 0f,
-                        endY = h * 0.45f
-                    )
-                )
-
-                // Mountain Peaks silhouette
-                val mountainPath = androidx.compose.ui.graphics.Path().apply {
-                    moveTo(0f, h * 0.4f)
-                    lineTo(w * 0.2f, h * 0.22f)
-                    lineTo(w * 0.35f, h * 0.35f)
-                    lineTo(w * 0.5f, h * 0.18f)
-                    lineTo(w * 0.68f, h * 0.32f)
-                    lineTo(w * 0.85f, h * 0.25f)
-                    lineTo(w, h * 0.38f)
-                    lineTo(w, h)
-                    lineTo(0f, h)
-                    close()
-                }
-                drawPath(mountainPath, Color(0xFF334155))
-
-                // Alpine Pine Tree Layer
-                drawRect(
-                    brush = Brush.verticalGradient(
-                        listOf(Color(0xFF166534), Color(0xFF14532D)),
-                        startY = h * 0.38f,
-                        endY = h * 0.6f
-                    ),
-                    topLeft = Offset(0f, h * 0.38f),
-                    size = Size(w, h * 0.22f)
-                )
-
-                // Crystal Lake Water Reflection with subtle ripples
-                drawRect(
-                    brush = Brush.verticalGradient(
-                        listOf(Color(0xFF0F766E), Color(0xFF115E59), Color(0xFF042F2E)),
-                        startY = h * 0.6f,
-                        endY = h
-                    ),
-                    topLeft = Offset(0f, h * 0.6f),
-                    size = Size(w, h * 0.4f)
-                )
-            }
         }
 
         // Gesture Overlay Layer: Handles Tap, Double-Tap, Vertical Brightness & Volume Drag, Pinch-to-zoom
@@ -320,7 +317,6 @@ fun FullScreenVideoPlayerScreen(
                 .pointerInput(videoState.isLocked) {
                     if (videoState.isLocked) return@pointerInput
                     detectTransformGestures { _, pan, zoom, _ ->
-                        // Pinch to zoom
                         zoomScale = (zoomScale * zoom).coerceIn(1.0f, 3.5f)
                         if (zoomScale > 1.0f) {
                             panOffsetX += pan.x
@@ -334,7 +330,6 @@ fun FullScreenVideoPlayerScreen(
                 .pointerInput(videoState.isLocked) {
                     if (videoState.isLocked) {
                         detectTapGestures {
-                            // When locked, tapping shows the unlock button briefly
                             showControls = !showControls
                         }
                         return@pointerInput
@@ -346,13 +341,10 @@ fun FullScreenVideoPlayerScreen(
                             if (isLeft) {
                                 videoEngine.seekRelative(-10000L)
                                 seekBubbleText = "-10s"
-                                seekBubbleForward = false
                             } else if (isRight) {
                                 videoEngine.seekRelative(10000L)
                                 seekBubbleText = "+10s"
-                                seekBubbleForward = true
                             } else {
-                                // Double tap center resets zoom
                                 zoomScale = 1.0f
                                 panOffsetX = 0f
                                 panOffsetY = 0f
@@ -366,7 +358,7 @@ fun FullScreenVideoPlayerScreen(
                 .pointerInput(videoState.isLocked, durationMs) {
                     if (videoState.isLocked) return@pointerInput
                     detectDragGestures(
-                        onDragStart = { offset ->
+                        onDragStart = {
                             userInteracting = true
                             activeGestureDirection = null
                             totalDragX = 0f
@@ -382,9 +374,6 @@ fun FullScreenVideoPlayerScreen(
                         },
                         onDragCancel = {
                             userInteracting = false
-                            if (activeGestureDirection == "SEEK" && hudSeekVisible) {
-                                videoEngine.seekTo(hudSeekTargetMs)
-                            }
                             activeGestureDirection = null
                         },
                         onDrag = { change, dragAmount ->
@@ -394,37 +383,41 @@ fun FullScreenVideoPlayerScreen(
                             if (activeGestureDirection == null) {
                                 val absX = kotlin.math.abs(totalDragX)
                                 val absY = kotlin.math.abs(totalDragY)
-                                val threshold = 10f
-
+                                val threshold = 12f
                                 if (absX > threshold || absY > threshold) {
                                     if (absX > absY) {
                                         activeGestureDirection = "SEEK"
                                     } else {
-                                        val touchX = change.position.x
-                                        val screenMid = size.width / 2f
-                                        activeGestureDirection = if (touchX < screenMid) "BRIGHTNESS" else "VOLUME"
+                                        val isLeft = change.position.x < size.width / 2f
+                                        activeGestureDirection = if (isLeft) "BRIGHTNESS" else "VOLUME"
                                     }
                                 }
                             }
 
                             when (activeGestureDirection) {
-                                "SEEK" -> {
-                                    val fullWidthMs = 120_000L // 2 minutes seeking window across full screen
-                                    val deltaMs = (totalDragX / size.width.toFloat() * fullWidthMs).toLong()
-                                    val targetMs = (dragStartPosMs + deltaMs).coerceIn(0L, durationMs.coerceAtLeast(1000L))
-                                    hudSeekTargetMs = targetMs
-                                    hudSeekDeltaMs = targetMs - dragStartPosMs
-                                    hudSeekVisible = true
-                                }
                                 "BRIGHTNESS" -> {
-                                    val delta = -dragAmount.y / 300f
-                                    videoEngine.adjustBrightnessDelta(activity, delta)
+                                    val deltaPercent = -dragAmount.y / (size.height * 0.75f)
+                                    activity?.let { act -> videoEngine.adjustBrightnessDelta(act, deltaPercent) }
                                     hudBrightnessVisible = true
+                                    hudVolumeVisible = false
+                                    hudSeekVisible = false
                                 }
                                 "VOLUME" -> {
-                                    val delta = -dragAmount.y / 300f
-                                    videoEngine.adjustVolumeDelta(delta)
+                                    val deltaPercent = -dragAmount.y / (size.height * 0.75f)
+                                    videoEngine.adjustVolumeDelta(deltaPercent)
                                     hudVolumeVisible = true
+                                    hudBrightnessVisible = false
+                                    hudSeekVisible = false
+                                }
+                                "SEEK" -> {
+                                    val deltaSec = (totalDragX / size.width) * 90f
+                                    val deltaMs = (deltaSec * 1000).toLong()
+                                    val target = (dragStartPosMs + deltaMs).coerceIn(0L, durationMs)
+                                    hudSeekDeltaMs = deltaMs
+                                    hudSeekTargetMs = target
+                                    hudSeekVisible = true
+                                    hudBrightnessVisible = false
+                                    hudVolumeVisible = false
                                 }
                             }
                         }
@@ -432,312 +425,244 @@ fun FullScreenVideoPlayerScreen(
                 }
         )
 
-        // HUD OVERLAYS: Double-tap seek bubble, Brightness HUD, Volume HUD
-        // Double-tap Seek Bubble
-        seekBubbleText?.let { text ->
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 60.dp),
-                contentAlignment = if (seekBubbleForward) Alignment.CenterEnd else Alignment.CenterStart
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(90.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xB311141E))
-                        .border(1.5.dp, Brush.radialGradient(listOf(Color(0x8000F0FF), Color(0x33B026FF))), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = if (seekBubbleForward) Icons.Default.FastForward else Icons.Default.FastRewind,
-                            contentDescription = null,
-                            tint = RefBlueCyanGlow,
-                            modifier = Modifier.size(32.dp)
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = text,
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp
-                        )
-                    }
-                }
-            }
-        }
-
-        // Center HUD: Horizontal Drag Seek Capsule
+        // GESTURE HUD INDICATORS
+        // Brightness HUD Bar on Left
         AnimatedVisibility(
-            visible = hudSeekVisible,
-            enter = fadeIn() + scaleIn(),
-            exit = fadeOut() + scaleOut(),
-            modifier = Modifier.align(Alignment.Center)
+            visible = hudBrightnessVisible,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.CenterStart).padding(start = 24.dp)
         ) {
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(24.dp))
-                    .background(Color(0xD90B101D))
-                    .border(1.5.dp, Brush.horizontalGradient(listOf(RefBlueCyanGlow, RefPurpleLight)), RoundedCornerShape(24.dp))
-                    .padding(horizontal = 24.dp, vertical = 16.dp),
+                    .background(Color.Black.copy(alpha = 0.55f))
+                    .border(1.dp, Color(0x44FFFFFF), RoundedCornerShape(24.dp))
+                    .padding(horizontal = 8.dp, vertical = 14.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (hudSeekDeltaMs >= 0) Icons.Default.FastForward else Icons.Default.FastRewind,
-                            contentDescription = null,
-                            tint = RefBlueCyanGlow,
-                            modifier = Modifier.size(28.dp)
-                        )
-                        Text(
-                            text = "${if (hudSeekDeltaMs >= 0) "+" else ""}${hudSeekDeltaMs / 1000}s",
-                            color = Color.White,
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.ExtraBold
-                        )
-                    }
-
-                    val targetMin = hudSeekTargetMs / 60000
-                    val targetSec = (hudSeekTargetMs % 60000) / 1000
-                    val targetStr = String.format("%02d:%02d", targetMin, targetSec)
-
-                    Text(
-                        text = "$targetStr / $durationTimeString",
-                        color = Color(0xFF94A3B8),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    // Target progress bar indicator
-                    val targetRatio = if (durationMs > 0) (hudSeekTargetMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f) else 0f
+                    Icon(Icons.Default.BrightnessMedium, contentDescription = null, tint = Color(0xFFFACC15), modifier = Modifier.size(18.dp))
                     Box(
                         modifier = Modifier
-                            .width(160.dp)
-                            .height(4.dp)
-                            .clip(CircleShape)
-                            .background(Color(0x40FFFFFF))
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxHeight()
-                                .fillMaxWidth(targetRatio)
-                                .background(Brush.horizontalGradient(listOf(RefBlueCyanGlow, RefPurpleLight)))
-                        )
-                    }
-                }
-            }
-        }
-
-        // Left HUD: Screen Brightness Vertical Capsule
-        AnimatedVisibility(
-            visible = hudBrightnessVisible,
-            enter = fadeIn() + scaleIn(),
-            exit = fadeOut() + scaleOut(),
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .padding(start = 28.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .width(52.dp)
-                    .height(170.dp)
-                    .clip(RoundedCornerShape(26.dp))
-                    .background(Color(0xB30B101D))
-                    .border(1.dp, Color(0x60FFFFFF), RoundedCornerShape(26.dp))
-                    .padding(vertical = 14.dp, horizontal = 8.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier.fillMaxHeight()
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.BrightnessMedium,
-                        contentDescription = "Brightness",
-                        tint = Color(0xFFFBBF24),
-                        modifier = Modifier.size(22.dp)
-                    )
-
-                    // Vertical Progress Bar
-                    Box(
-                        modifier = Modifier
-                            .width(6.dp)
-                            .height(80.dp)
+                            .width(5.dp)
+                            .height(110.dp)
                             .clip(RoundedCornerShape(3.dp))
-                            .background(Color(0x40FFFFFF))
+                            .background(Color.White.copy(alpha = 0.2f))
                     ) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .fillMaxHeight(videoState.brightnessPercent)
                                 .align(Alignment.BottomCenter)
-                                .background(Brush.verticalGradient(listOf(Color(0xFFFBBF24), Color(0xFFF59E0B))))
+                                .background(Color(0xFFFACC15))
                         )
                     }
-
                     Text(
                         text = "${(videoState.brightnessPercent * 100).toInt()}%",
                         color = Color.White,
-                        fontSize = 11.sp,
+                        fontSize = 9.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
             }
         }
 
-        // Right HUD: Audio Volume Vertical Capsule
+        // Volume HUD Bar on Right
         AnimatedVisibility(
             visible = hudVolumeVisible,
-            enter = fadeIn() + scaleIn(),
-            exit = fadeOut() + scaleOut(),
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .padding(end = 28.dp)
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.CenterEnd).padding(end = 24.dp)
         ) {
             Box(
                 modifier = Modifier
-                    .width(52.dp)
-                    .height(170.dp)
-                    .clip(RoundedCornerShape(26.dp))
-                    .background(Color(0xB30B101D))
-                    .border(1.dp, Color(0x60FFFFFF), RoundedCornerShape(26.dp))
-                    .padding(vertical = 14.dp, horizontal = 8.dp),
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(Color.Black.copy(alpha = 0.55f))
+                    .border(1.dp, Color(0x44FFFFFF), RoundedCornerShape(24.dp))
+                    .padding(horizontal = 8.dp, vertical = 14.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier.fillMaxHeight()
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.VolumeUp,
-                        contentDescription = "Volume",
-                        tint = RefBlueCyanGlow,
-                        modifier = Modifier.size(22.dp)
-                    )
-
-                    // Vertical Progress Bar
+                    Icon(Icons.Default.VolumeUp, contentDescription = null, tint = colors.accentGlow, modifier = Modifier.size(18.dp))
                     Box(
                         modifier = Modifier
-                            .width(6.dp)
-                            .height(80.dp)
+                            .width(5.dp)
+                            .height(110.dp)
                             .clip(RoundedCornerShape(3.dp))
-                            .background(Color(0x40FFFFFF))
+                            .background(Color.White.copy(alpha = 0.2f))
                     ) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .fillMaxHeight(videoState.volumePercent)
                                 .align(Alignment.BottomCenter)
-                                .background(Brush.verticalGradient(listOf(RefBlueCyanGlow, RefPurpleLight)))
+                                .background(colors.accentGlow)
                         )
                     }
-
                     Text(
                         text = "${(videoState.volumePercent * 100).toInt()}%",
                         color = Color.White,
-                        fontSize = 11.sp,
+                        fontSize = 9.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
             }
         }
 
-        // SCREEN LOCKED FLOATING UNLOCK BUTTON
+        // Seek Scrub HUD Indicator (Center Floating Glass Bubble)
+        AnimatedVisibility(
+            visible = hudSeekVisible,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.Center)
+        ) {
+            val sMin = hudSeekTargetMs / 60000
+            val sSec = (hudSeekTargetMs % 60000) / 1000
+            val sign = if (hudSeekDeltaMs >= 0) "+" else ""
+            val deltaSec = hudSeekDeltaMs / 1000
+
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color.Black.copy(alpha = 0.65f))
+                    .border(1.dp, colors.accentGlow.copy(alpha = 0.6f), RoundedCornerShape(20.dp))
+                    .padding(horizontal = 18.dp, vertical = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = String.format("%02d:%02d", sMin, sSec),
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Text(
+                        text = "[$sign${deltaSec}s]",
+                        color = colors.accentGlow,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+
+        // Double-tap Seek Bubble Ripple (+10s / -10s)
+        AnimatedVisibility(
+            visible = seekBubbleText != null,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.Center)
+        ) {
+            Box(
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.55f))
+                    .border(1.dp, Color.White.copy(alpha = 0.5f), CircleShape)
+                    .padding(20.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = seekBubbleText ?: "",
+                    color = Color.White,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        // LOCKED FLOATING UNLOCK BUTTON
         if (videoState.isLocked) {
             AnimatedVisibility(
                 visible = showControls,
                 enter = fadeIn(),
                 exit = fadeOut(),
-                modifier = Modifier.align(Alignment.TopEnd).padding(24.dp)
+                modifier = Modifier.align(Alignment.TopEnd).padding(20.dp).statusBarsPadding()
             ) {
-                Row(
+                Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(Color(0xB30B101D))
-                        .border(1.5.dp, Color(0xFFFACC15), RoundedCornerShape(24.dp))
+                        .clip(RoundedCornerShape(22.dp))
+                        .background(Color.Black.copy(alpha = 0.65f))
+                        .border(1.2.dp, Color(0xFFFACC15), RoundedCornerShape(22.dp))
                         .clickable { videoEngine.setScreenLock(false) }
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        .padding(horizontal = 14.dp, vertical = 8.dp)
                 ) {
-                    Icon(Icons.Default.Lock, contentDescription = "Locked", tint = Color(0xFFFACC15), modifier = Modifier.size(20.dp))
-                    Text("Screen Locked • Tap to Unlock", color = Color(0xFFFACC15), fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(Icons.Default.Lock, contentDescription = "Locked", tint = Color(0xFFFACC15), modifier = Modifier.size(16.dp))
+                        Text("Screen Locked • Tap to Unlock", color = Color(0xFFFACC15), fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                    }
                 }
             }
         }
 
-        // LIVE DUAL SUBTITLES OVERLAY (Synchronized with video position ms)
+        // DELICATE SUBTITLES OVERLAY (Non-obstructive at bottom)
         subtitleManager?.let { sm ->
             val settings by sm.settings.collectAsStateWithLifecycle()
             val upperCue = sm.getCurrentUpperCue(videoState.currentPositionMs)
             val lowerCue = sm.getCurrentLowerCue(videoState.currentPositionMs)
 
-            if (upperCue != null || lowerCue != null) {
+            if ((upperCue != null || lowerCue != null) && videoState.currentSubtitleTrackIndex > 0) {
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .padding(bottom = if (showControls && !videoState.isLocked) 130.dp else 40.dp)
+                        .padding(bottom = if (showControls && !videoState.isLocked) 80.dp else 24.dp)
                         .padding(horizontal = 24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     upperCue?.let { text ->
                         Text(
                             text = text,
-                            fontSize = settings.upperFontSizeSp.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = settings.upperColor,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.White,
                             modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color.Black.copy(alpha = settings.backgroundOpacity))
-                                .padding(horizontal = 14.dp, vertical = 6.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color.Black.copy(alpha = 0.5f))
+                                .padding(horizontal = 8.dp, vertical = 2.dp)
                         )
                     }
-
                     lowerCue?.let { text ->
                         Text(
                             text = text,
-                            fontSize = settings.lowerFontSizeSp.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = settings.lowerColor,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Normal,
+                            color = Color(0xFFFFD54F),
                             modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color.Black.copy(alpha = settings.backgroundOpacity))
-                                .padding(horizontal = 14.dp, vertical = 6.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color.Black.copy(alpha = 0.5f))
+                                .padding(horizontal = 8.dp, vertical = 2.dp)
                         )
                     }
                 }
             }
         }
 
-        // FULL 70% TRANSPARENT SUPER CRYSTAL LIQUID GLASS CONTROL PANELS
+        // FLOATING CRYSTAL LIQUID GLASS CONTROLS (Exactly cloned from Image 2)
         if (!videoState.isLocked) {
             AnimatedVisibility(
                 visible = showControls,
-                enter = fadeIn(animationSpec = tween(250)),
-                exit = fadeOut(animationSpec = tween(250))
+                enter = fadeIn(animationSpec = tween(200)),
+                exit = fadeOut(animationSpec = tween(200))
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.25f))
                         .statusBarsPadding()
                         .navigationBarsPadding()
-                        .padding(horizontal = 20.dp, vertical = 10.dp)
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
                 ) {
-                    // TOP BAR: Title & Floating Glass Action Pill Capsules
+                    // TOP BAR: Left Title & Right Floating Glass Capsule [Image 2 Top]
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -745,393 +670,390 @@ fun FullScreenVideoPlayerScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Left Capsule: Back Button + Title + 4K Tag
+                        // Top Left: Back Arrow + Video Title
                         Row(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(24.dp))
-                                .background(Color(0xB30B101D)) // 70% transparent crystal glass
-                                .border(1.dp, Color(0x55FFFFFF), RoundedCornerShape(24.dp))
-                                .padding(horizontal = 14.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Back",
-                                tint = Color.White,
-                                modifier = Modifier
-                                    .size(20.dp)
-                                    .clickable { onBack() }
-                            )
-
-                            Text(
-                                text = video?.title ?: "Beau paysage (The Studio)",
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 15.sp
-                                ),
-                                color = Color.White
-                            )
-
                             Box(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(Color(0x3300F0FF))
-                                    .border(0.5.dp, RefBlueCyanGlow.copy(alpha = 0.6f), RoundedCornerShape(6.dp))
-                                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                            ) {
-                                Text(
-                                    text = "4K HDR",
-                                    color = RefBlueCyanGlow,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.ExtraBold
-                                )
-                            }
-                        }
-
-                        // Right Capsule: [Loop/Replay] [PiP] [Audio & CC] [More Settings]
-                        Row(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(24.dp))
-                                .background(Color(0xB30B101D)) // 70% transparent crystal glass
-                                .border(1.dp, Color(0x55FFFFFF), RoundedCornerShape(24.dp))
-                                .padding(horizontal = 14.dp, vertical = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Loop Toggle
-                            Icon(
-                                imageVector = Icons.Default.Repeat,
-                                contentDescription = "Loop",
-                                tint = if (videoState.isLooping) RefBlueCyanGlow else Color.White,
-                                modifier = Modifier
-                                    .size(19.dp)
-                                    .clickable { videoEngine.toggleLoop() }
-                            )
-
-                            // PiP Mode
-                            Icon(
-                                imageVector = Icons.Default.PictureInPictureAlt,
-                                contentDescription = "Picture-in-Picture",
-                                tint = Color.White,
-                                modifier = Modifier
-                                    .size(19.dp)
-                                    .clickable {
-                                        try {
-                                            activity?.enterPictureInPictureMode()
-                                        } catch (e: Exception) {
-                                            e.printStackTrace()
-                                        }
-                                    }
-                            )
-
-                            // Subtitles & Audio Chooser (UI references b35ecc5e & 1cb5f32d)
-                            Row(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(if (videoState.currentSubtitleTrackIndex > 0) Color(0x4000F0FF) else Color.Transparent)
-                                    .clickable { showTrackChooserDialog = true }
-                                    .padding(horizontal = 6.dp, vertical = 2.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    .size(34.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.Black.copy(alpha = 0.4f))
+                                    .clickable { onBack() },
+                                contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Subtitles,
-                                    contentDescription = "Subtitles",
-                                    tint = if (videoState.currentSubtitleTrackIndex > 0) RefBlueCyanGlow else Color.White,
-                                    modifier = Modifier.size(17.dp)
-                                )
-                                Text(
-                                    text = "CC",
-                                    color = if (videoState.currentSubtitleTrackIndex > 0) RefBlueCyanGlow else Color.White,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Back",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp)
                                 )
                             }
 
-                            // Quick Equalizer link
-                            Icon(
-                                imageVector = Icons.Default.Equalizer,
-                                contentDescription = "EQ",
-                                tint = Color.White,
-                                modifier = Modifier
-                                    .size(19.dp)
-                                    .clickable { onNavigate(Screen.EqStudio) }
+                            Text(
+                                text = video?.title ?: "Beau paysage",
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                ),
+                                color = Color.White,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
+                        }
 
-                            // More options
-                            Icon(
-                                imageVector = Icons.Default.MoreVert,
-                                contentDescription = "More",
-                                tint = Color.White,
-                                modifier = Modifier
-                                    .size(19.dp)
-                                    .clickable { onNavigate(Screen.SubtitleManager) }
-                            )
+                        // Top Right: Floating Glass Capsule [Replay/Aspect | CC | More ⋮]
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(Color.Black.copy(alpha = 0.45f))
+                                .border(
+                                    0.8.dp,
+                                    Brush.horizontalGradient(listOf(Color(0x60FFFFFF), Color(0x20FFFFFF))),
+                                    RoundedCornerShape(20.dp)
+                                )
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Replay / Loop toggle
+                                Icon(
+                                    imageVector = Icons.Default.Replay,
+                                    contentDescription = "Replay",
+                                    tint = if (videoState.isLooping) colors.accentGlow else Color.White,
+                                    modifier = Modifier
+                                        .size(17.dp)
+                                        .clickable {
+                                            videoEngine.toggleLoop()
+                                            seekBubbleText = if (!videoState.isLooping) "Loop: ON" else "Loop: OFF"
+                                        }
+                                )
+
+                                // CC (Subtitles) toggle
+                                Box(
+                                    modifier = Modifier.clickable {
+                                        val nextIdx = if (videoState.currentSubtitleTrackIndex > 0) 0 else 1
+                                        videoEngine.selectSubtitleTrack(nextIdx)
+                                        seekBubbleText = if (nextIdx > 0) "Subtitles: ON" else "Subtitles: OFF"
+                                    }
+                                ) {
+                                    Text(
+                                        text = "CC",
+                                        color = if (videoState.currentSubtitleTrackIndex > 0) colors.accentGlow else Color.White,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+
+                                // More Options ⋮
+                                Icon(
+                                    imageVector = Icons.Default.MoreVert,
+                                    contentDescription = "Options",
+                                    tint = Color.White,
+                                    modifier = Modifier
+                                        .size(17.dp)
+                                        .clickable { showOptionsDialog = true }
+                                )
+                            }
                         }
                     }
 
-                    // CENTER FLOATING LIQUID GLASS CONTROLS: [-10s] [Prev] [Play/Pause] [Next] [+10s]
+                    // CENTER FLOATING CRYSTAL LIQUID GLASS MEDIA CONTROLS [Image 2 Center]
                     Box(
                         modifier = Modifier
                             .align(Alignment.Center)
-                            .padding(horizontal = 24.dp)
+                            .clip(RoundedCornerShape(32.dp))
+                            .background(Color.Black.copy(alpha = 0.45f))
+                            .border(
+                                1.dp,
+                                Brush.horizontalGradient(listOf(Color(0x60FFFFFF), Color(0x20FFFFFF))),
+                                RoundedCornerShape(32.dp)
+                            )
+                            .padding(horizontal = 18.dp, vertical = 8.dp)
                     ) {
-                        MediaControlPanel(
-                            isPlaying = videoState.isPlaying,
-                            onPlayPause = { videoEngine.togglePlayPause() },
-                            onNext = { videoEngine.seekRelative(10000L) },
-                            onPrevious = { videoEngine.seekRelative(-10000L) },
-                            onSeekRelative = { delta -> videoEngine.seekRelative(delta) },
-                            isVideoMode = true
-                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(22.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Previous (|◀)
+                            Icon(
+                                imageVector = Icons.Default.SkipPrevious,
+                                contentDescription = "Previous",
+                                tint = Color.White,
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .clickable { videoEngine.seekRelative(-10000L) }
+                            )
+
+                            // Play / Pause (▶ / ❚❚)
+                            Box(
+                                modifier = Modifier
+                                    .size(46.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.White.copy(alpha = 0.2f))
+                                    .border(1.dp, Color.White.copy(alpha = 0.6f), CircleShape)
+                                    .clickable { videoEngine.togglePlayPause() },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = if (videoState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                    contentDescription = if (videoState.isPlaying) "Pause" else "Play",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(26.dp)
+                                )
+                            }
+
+                            // Next (▶|)
+                            Icon(
+                                imageVector = Icons.Default.SkipNext,
+                                contentDescription = "Next",
+                                tint = Color.White,
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .clickable { videoEngine.seekRelative(10000L) }
+                            )
+                        }
                     }
 
-                    // BOTTOM 70% TRANSPARENT SUPER CRYSTAL LIQUID GLASS CONTROL PANEL
-                    Box(
+                    // BOTTOM CONTROLS: Progress Bar + Floating Pills [Image 2 Bottom]
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .align(Alignment.BottomCenter)
-                            .clip(RoundedCornerShape(30.dp))
-                            .background(Color(0xB30B101D)) // Exactly 70% transparent midnight crystal glass
-                            .border(
-                                1.5.dp,
-                                Brush.horizontalGradient(
-                                    listOf(
-                                        Color(0x60FFFFFF),
-                                        Color(0x3300F0FF),
-                                        Color(0x44B026FF),
-                                        Color(0x60FFFFFF)
-                                    )
-                                ),
-                                RoundedCornerShape(30.dp)
-                            )
-                            .padding(horizontal = 20.dp, vertical = 14.dp)
+                            .align(Alignment.BottomCenter),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Column(modifier = Modifier.fillMaxWidth()) {
-                            // Section 1: Timeline Scrubber & Timestamp Labels
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = currentTimeString,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = Color.White,
-                                    modifier = Modifier.width(44.dp)
-                                )
+                        // Section 1: Thin Glowing Progress Timeline Scrubber
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = currentTimeString,
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Color.White,
+                                modifier = Modifier.width(36.dp)
+                            )
 
-                                Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
 
-                                // Interactive Glowing Timeline Track
-                                Canvas(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(26.dp)
-                                        .pointerInput(durationMs) {
-                                            detectTapGestures { offset ->
+                            // Interactive Timeline Slider Canvas
+                            Canvas(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(20.dp)
+                                    .pointerInput(durationMs) {
+                                        detectTapGestures { offset ->
+                                            if (size.width > 0f) {
                                                 val factor = (offset.x / size.width).coerceIn(0f, 1f)
                                                 videoEngine.seekTo((factor * durationMs).toLong())
                                             }
                                         }
-                                        .pointerInput(durationMs) {
-                                            detectDragGestures { change, _ ->
+                                    }
+                                    .pointerInput(durationMs) {
+                                        detectDragGestures { change, _ ->
+                                            if (size.width > 0f) {
                                                 val factor = (change.position.x / size.width).coerceIn(0f, 1f)
                                                 videoEngine.seekTo((factor * durationMs).toLong())
                                             }
                                         }
-                                        .testTag("video_timeline_slider")
-                                ) {
-                                    val cy = size.height / 2
-                                    val trackHeight = 4.dp.toPx()
+                                    }
+                                    .testTag("video_timeline_slider")
+                            ) {
+                                if (size.width <= 0f || size.height <= 0f) return@Canvas
 
-                                    // Background Track
-                                    drawRoundRect(
-                                        color = Color(0x4DFFFFFF),
-                                        topLeft = Offset(0f, cy - trackHeight / 2),
-                                        size = Size(size.width, trackHeight),
-                                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(trackHeight / 2, trackHeight / 2)
-                                    )
+                                val cy = size.height / 2
+                                val trackH = 3.dp.toPx()
 
-                                    // Active Track Gradient (Cyan to Purple)
-                                    val activeWidth = size.width * progress
-                                    drawRoundRect(
-                                        brush = Brush.horizontalGradient(
-                                            listOf(RefBlueCyanGlow, RefPurpleLight)
-                                        ),
-                                        topLeft = Offset(0f, cy - trackHeight / 2),
-                                        size = Size(activeWidth, trackHeight),
-                                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(trackHeight / 2, trackHeight / 2)
-                                    )
+                                // Background track
+                                drawRoundRect(
+                                    color = Color.White.copy(alpha = 0.25f),
+                                    topLeft = Offset(0f, cy - trackH / 2),
+                                    size = Size(size.width, trackH),
+                                    cornerRadius = CornerRadius(trackH / 2, trackH / 2)
+                                )
 
-                                    // Glowing Thumb with double ring
-                                    drawCircle(
-                                        color = RefBlueCyanGlow.copy(alpha = 0.35f),
-                                        radius = 11.dp.toPx(),
-                                        center = Offset(activeWidth, cy)
-                                    )
-                                    drawCircle(
-                                        color = Color.White,
-                                        radius = 6.dp.toPx(),
-                                        center = Offset(activeWidth, cy)
-                                    )
-                                }
+                                // Active progress track
+                                val activeWidth = size.width * progress
+                                drawRoundRect(
+                                    color = Color.White,
+                                    topLeft = Offset(0f, cy - trackH / 2),
+                                    size = Size(activeWidth, trackH),
+                                    cornerRadius = CornerRadius(trackH / 2, trackH / 2)
+                                )
 
-                                Spacer(modifier = Modifier.width(8.dp))
-
-                                Text(
-                                    text = durationTimeString,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = Color(0xFFA1A1AA),
-                                    modifier = Modifier.width(44.dp)
+                                // Glowing White Thumb Circle
+                                drawCircle(
+                                    color = Color.White,
+                                    radius = 5.5.dp.toPx(),
+                                    center = Offset(activeWidth, cy)
                                 )
                             }
 
-                            Spacer(modifier = Modifier.height(10.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
 
-                            // Section 2: Floating Pill Capsules Row
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                            Text(
+                                text = durationTimeString,
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Color.White,
+                                modifier = Modifier.width(36.dp)
+                            )
+                        }
+
+                        // Section 2: Bottom-Left Pill & Bottom-Right Pill [Image 2 Dual Floating Capsules]
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Bottom-Left Floating Capsule [Aspect Ratio / Fit | GIF]
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(Color.Black.copy(alpha = 0.45f))
+                                    .border(
+                                        0.8.dp,
+                                        Brush.horizontalGradient(listOf(Color(0x60FFFFFF), Color(0x20FFFFFF))),
+                                        RoundedCornerShape(20.dp)
+                                    )
+                                    .padding(horizontal = 12.dp, vertical = 6.dp)
                             ) {
-                                // Left Pill Group: [Aspect Mode] [Zoom Status] [HW Accel]
                                 Row(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(18.dp))
-                                        .background(Color(0x55181822))
-                                        .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(18.dp))
-                                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(14.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    // Aspect Ratio Toggle
-                                    Row(
+                                    // Aspect Ratio / Fit mode button
+                                    Icon(
+                                        imageVector = Icons.Default.CropFree,
+                                        contentDescription = "Aspect Ratio",
+                                        tint = Color.White,
                                         modifier = Modifier
+                                            .size(17.dp)
                                             .clickable {
                                                 val nextMode = when (videoState.aspectRatioMode) {
                                                     VideoAspectRatioMode.FIT -> VideoAspectRatioMode.FILL
                                                     VideoAspectRatioMode.FILL -> VideoAspectRatioMode.ZOOM
                                                     VideoAspectRatioMode.ZOOM -> VideoAspectRatioMode.FIXED_4_3
-                                                    VideoAspectRatioMode.FIXED_4_3 -> VideoAspectRatioMode.FIXED_21_9
-                                                    VideoAspectRatioMode.FIXED_21_9 -> VideoAspectRatioMode.FIT
+                                                    VideoAspectRatioMode.FIXED_4_3 -> VideoAspectRatioMode.FIT
+                                                    else -> VideoAspectRatioMode.FIT
                                                 }
                                                 videoEngine.setAspectRatio(nextMode)
-                                            },
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.CropFree,
-                                            contentDescription = "Aspect Ratio",
-                                            tint = RefBlueCyanGlow,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                        Text(
-                                            text = videoState.aspectRatioMode.label,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color.White
-                                        )
-                                    }
-
-                                    // Zoom percentage indicator if zoomed
-                                    if (zoomScale > 1.05f) {
-                                        Text(
-                                            text = "${(zoomScale * 100).toInt()}% Zoom",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color(0xFF38BDF8),
-                                            modifier = Modifier.clickable {
-                                                zoomScale = 1.0f
-                                                panOffsetX = 0f
-                                                panOffsetY = 0f
+                                                seekBubbleText = "Aspect: ${nextMode.label}"
                                             }
-                                        )
-                                    }
+                                    )
 
-                                    // HW Decoder Tag
-                                    Text(
-                                        text = "HW+",
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        color = Color(0xFF4ADE80)
+                                    // GIF / Capture icon
+                                    Icon(
+                                        imageVector = Icons.Default.Gif,
+                                        contentDescription = "GIF",
+                                        tint = Color.White,
+                                        modifier = Modifier
+                                            .size(18.dp)
+                                            .clickable {
+                                                seekBubbleText = "📸 Snapshot Saved to Gallery"
+                                            }
                                     )
                                 }
+                            }
 
-                                // Right Pill Group: [Playback Speed] [Audio/CC Dialog] [Screen Lock]
+                            // Bottom-Right Floating Capsule [Resize/PiP | Speed | Rotate | Lock]
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(Color.Black.copy(alpha = 0.45f))
+                                    .border(
+                                        0.8.dp,
+                                        Brush.horizontalGradient(listOf(Color(0x60FFFFFF), Color(0x20FFFFFF))),
+                                        RoundedCornerShape(20.dp)
+                                    )
+                                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
                                 Row(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(18.dp))
-                                        .background(Color(0x55181822))
-                                        .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(18.dp))
-                                        .padding(horizontal = 10.dp, vertical = 6.dp),
                                     horizontalArrangement = Arrangement.spacedBy(14.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    // Speed Pill: Click cycles through 0.5x, 0.75x, 1.0x, 1.25x, 1.5x, 2.0x, 3.0x
-                                    Row(
-                                        modifier = Modifier
-                                            .clickable {
-                                                val nextSpeed = when (videoState.playbackSpeed) {
-                                                    0.5f -> 0.75f
-                                                    0.75f -> 1.0f
-                                                    1.0f -> 1.25f
-                                                    1.25f -> 1.5f
-                                                    1.5f -> 2.0f
-                                                    2.0f -> 3.0f
-                                                    3.0f -> 4.0f
-                                                    else -> 0.5f
-                                                }
-                                                videoEngine.setPlaybackSpeed(nextSpeed)
-                                            },
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(3.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Speed,
-                                            contentDescription = "Speed",
-                                            tint = Color.White,
-                                            modifier = Modifier.size(15.dp)
-                                        )
-                                        Text(
-                                            text = "${videoState.playbackSpeed}x",
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color.White
-                                        )
-                                    }
-
-                                    // Audio Tracks quick button
+                                    // Picture in Picture
                                     Icon(
-                                        imageVector = Icons.Default.Headphones,
-                                        contentDescription = "Audio Tracks",
+                                        imageVector = Icons.Default.PictureInPictureAlt,
+                                        contentDescription = "PiP",
+                                        tint = Color.White,
+                                        modifier = Modifier
+                                            .size(16.dp)
+                                            .clickable {
+                                                seekBubbleText = "Entering PiP Mode"
+                                                onEnterPip()
+                                            }
+                                    )
+
+                                    // Fullscreen / Fit toggle
+                                    Icon(
+                                        imageVector = Icons.Default.Fullscreen,
+                                        contentDescription = "Fullscreen",
                                         tint = Color.White,
                                         modifier = Modifier
                                             .size(17.dp)
-                                            .clickable { showTrackChooserDialog = true }
+                                            .clickable {
+                                                val nextMode = if (videoState.aspectRatioMode == VideoAspectRatioMode.FILL) VideoAspectRatioMode.FIT else VideoAspectRatioMode.FILL
+                                                videoEngine.setAspectRatio(nextMode)
+                                                seekBubbleText = "Aspect: ${nextMode.label}"
+                                            }
                                     )
 
-                                    // Screen Orientation toggle indicator
+                                    // Speed (1.0x)
+                                    Text(
+                                        text = "${videoState.playbackSpeed}x",
+                                        color = Color.White,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.clickable {
+                                            val nextSpeed = when (videoState.playbackSpeed) {
+                                                1.0f -> 1.25f
+                                                1.25f -> 1.5f
+                                                1.5f -> 2.0f
+                                                2.0f -> 0.5f
+                                                0.5f -> 0.75f
+                                                else -> 1.0f
+                                            }
+                                            videoEngine.setPlaybackSpeed(nextSpeed)
+                                            seekBubbleText = "Speed: ${nextSpeed}x"
+                                        }
+                                    )
+
+                                    // Screen Rotate toggle
                                     Icon(
                                         imageVector = Icons.Default.ScreenRotation,
                                         contentDescription = "Rotate",
                                         tint = Color.White,
                                         modifier = Modifier
-                                            .size(17.dp)
-                                            .clickable { }
+                                            .size(16.dp)
+                                            .clickable {
+                                                activity?.let { act ->
+                                                    val newOrient = if (act.requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE || act.requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE) {
+                                                        ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                                                    } else {
+                                                        ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                                                    }
+                                                    act.requestedOrientation = newOrient
+                                                    seekBubbleText = if (newOrient == ActivityInfo.SCREEN_ORIENTATION_PORTRAIT) "Portrait" else "Landscape"
+                                                }
+                                            }
                                     )
 
-                                    // Screen Lock button
+                                    // Lock Touch Screen
                                     Icon(
-                                        imageVector = if (videoState.isLocked) Icons.Default.Lock else Icons.Default.LockOpen,
-                                        contentDescription = "Lock",
-                                        tint = if (videoState.isLocked) Color(0xFFFACC15) else Color.White,
+                                        imageVector = Icons.Default.LockOpen,
+                                        contentDescription = "Lock Screen",
+                                        tint = Color.White,
                                         modifier = Modifier
-                                            .size(17.dp)
-                                            .clickable { videoEngine.setScreenLock(true) }
+                                            .size(16.dp)
+                                            .clickable {
+                                                videoEngine.setScreenLock(true)
+                                                seekBubbleText = "Controls Locked"
+                                            }
                                     )
                                 }
                             }
@@ -1141,40 +1063,41 @@ fun FullScreenVideoPlayerScreen(
             }
         }
 
-        // TABBED AUDIO & SUBTITLE CHOOSER DIALOG (Cloned from Reference b35ecc5e & 1cb5f32d)
-        if (showTrackChooserDialog) {
-            AudioAndSubtitleChooserDialog(
+        // FLOATING OPTIONS DIALOG (When More ⋮ is clicked)
+        if (showOptionsDialog) {
+            VideoOptionsCrystalDialog(
                 videoState = videoState,
-                onDismiss = { showTrackChooserDialog = false },
-                onSelectAudioTrack = { idx -> videoEngine.selectAudioTrack(idx) },
-                onSelectSubtitleTrack = { idx -> videoEngine.selectSubtitleTrack(idx) },
-                onAdjustAudioDelay = { delta -> videoEngine.adjustAudioDelay(delta) },
-                onAdjustSubtitleDelay = { delta -> videoEngine.adjustSubtitleDelay(delta) }
+                onDismiss = { showOptionsDialog = false },
+                onSelectSpeed = { s -> videoEngine.setPlaybackSpeed(s) },
+                onSelectSubtitle = { idx -> videoEngine.selectSubtitleTrack(idx) },
+                onNavigateToSubtitleManager = {
+                    showOptionsDialog = false
+                    onNavigate(Screen.SubtitleManager)
+                },
+                onNavigateToEqualizer = {
+                    showOptionsDialog = false
+                    onNavigate(Screen.EqStudio)
+                }
             )
         }
     }
 }
 
-/**
- * Modern Super Crystal Liquid Glass Dialog matching Reference b35ecc5e:
- * "Choose subtitles and audio tracks" with side-by-side tabs and delay step controls.
- */
 @Composable
-fun AudioAndSubtitleChooserDialog(
+private fun VideoOptionsCrystalDialog(
     videoState: com.example.media.video.VideoPlaybackState,
     onDismiss: () -> Unit,
-    onSelectAudioTrack: (Int) -> Unit,
-    onSelectSubtitleTrack: (Int) -> Unit,
-    onAdjustAudioDelay: (Long) -> Unit,
-    onAdjustSubtitleDelay: (Long) -> Unit
+    onSelectSpeed: (Float) -> Unit,
+    onSelectSubtitle: (Int) -> Unit,
+    onNavigateToSubtitleManager: () -> Unit,
+    onNavigateToEqualizer: () -> Unit
 ) {
-    var selectedTab by remember { mutableIntStateOf(0) } // 0 = Audio, 1 = Subtitles
-    var subtitleFontSize by remember { mutableIntStateOf(25) }
+    val colors = LocalMatrixColors.current
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.70f))
+            .background(Color.Black.copy(alpha = 0.65f))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null
@@ -1183,33 +1106,32 @@ fun AudioAndSubtitleChooserDialog(
     ) {
         Box(
             modifier = Modifier
-                .width(520.dp)
-                .clip(RoundedCornerShape(28.dp))
-                .background(Color(0xE6141824)) // Deep crystal glass panel
+                .width(360.dp)
+                .clip(RoundedCornerShape(24.dp))
+                .background(Color(0xE6141824))
                 .border(
-                    1.5.dp,
-                    Brush.linearGradient(listOf(Color(0x60FFFFFF), Color(0x3000F0FF), Color(0x40B026FF))),
-                    RoundedCornerShape(28.dp)
+                    1.dp,
+                    Brush.linearGradient(listOf(Color(0x60FFFFFF), colors.accentGlow.copy(alpha = 0.4f))),
+                    RoundedCornerShape(24.dp)
                 )
                 .clickable(enabled = false) { }
-                .padding(22.dp)
+                .padding(18.dp)
         ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                // Header Row
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                // Header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Choose Subtitles & Audio Tracks",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 17.sp
-                        ),
+                        text = "Video Settings",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         color = Color.White
                     )
-
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "Close",
@@ -1220,229 +1142,107 @@ fun AudioAndSubtitleChooserDialog(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                // Playback Speed Options
+                Column {
+                    Text("Playback Speed", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = colors.accentGlow)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f).forEach { spd ->
+                            val isSel = videoState.playbackSpeed == spd
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSel) colors.accentGlow else Color.White.copy(alpha = 0.1f))
+                                    .clickable { onSelectSpeed(spd) }
+                                    .padding(vertical = 5.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "${spd}x",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isSel) Color.Black else Color.White
+                                )
+                            }
+                        }
+                    }
+                }
 
-                // Tab Switcher: [Audio] | [Subtitles]
+                // Subtitle Quick Toggle
+                Column {
+                    Text("Subtitles", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = colors.accentGlow)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(if (videoState.currentSubtitleTrackIndex == 0) colors.accentGlow else Color.White.copy(alpha = 0.1f))
+                                .clickable { onSelectSubtitle(0) }
+                                .padding(vertical = 7.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("Disabled", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (videoState.currentSubtitleTrackIndex == 0) Color.Black else Color.White)
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(if (videoState.currentSubtitleTrackIndex > 0) colors.accentGlow else Color.White.copy(alpha = 0.1f))
+                                .clickable { onSelectSubtitle(1) }
+                                .padding(vertical = 7.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("Enabled (CC)", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (videoState.currentSubtitleTrackIndex > 0) Color.Black else Color.White)
+                        }
+                    }
+                }
+
+                // External Studio Shortcuts
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0x400B101D))
-                        .padding(4.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(if (selectedTab == 0) Color(0x6600F0FF) else Color.Transparent)
-                            .clickable { selectedTab = 0 }
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Color.White.copy(alpha = 0.08f))
+                            .border(0.6.dp, colors.glassBorder, RoundedCornerShape(10.dp))
+                            .clickable { onNavigateToSubtitleManager() }
                             .padding(vertical = 8.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(Icons.Default.Headphones, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                            Text("Audio", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Subtitles, contentDescription = null, tint = colors.accentGlow, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Subtitle Studio", fontSize = 10.5.sp, color = Color.White)
                         }
                     }
 
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(if (selectedTab == 1) Color(0x6600F0FF) else Color.Transparent)
-                            .clickable { selectedTab = 1 }
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Color.White.copy(alpha = 0.08f))
+                            .border(0.6.dp, colors.glassBorder, RoundedCornerShape(10.dp))
+                            .clickable { onNavigateToEqualizer() }
                             .padding(vertical = 8.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(Icons.Default.Subtitles, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                            Text("Subtitles", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Equalizer, contentDescription = null, tint = Color(0xFFB026FF), modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("EQ Studio", fontSize = 10.5.sp, color = Color.White)
                         }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                if (selectedTab == 0) {
-                    // AUDIO TAB CONTENT
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text("Available Streams:", color = Color(0xFFA1A1AA), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-
-                        videoState.availableAudioTracks.forEachIndexed { index, trackName ->
-                            val isSelected = videoState.currentAudioTrackIndex == index
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(if (isSelected) Color(0x4000F0FF) else Color(0x20FFFFFF))
-                                    .clickable { onSelectAudioTrack(index) }
-                                    .padding(horizontal = 14.dp, vertical = 10.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = trackName,
-                                    color = if (isSelected) RefBlueCyanGlow else Color.White,
-                                    fontSize = 13.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                )
-                                if (isSelected) {
-                                    Icon(Icons.Default.Check, contentDescription = null, tint = RefBlueCyanGlow, modifier = Modifier.size(18.dp))
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        // Audio Delay Control
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("Audio Delay:", color = Color.White, fontSize = 13.sp)
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(CircleShape)
-                                        .background(Color(0x40FFFFFF))
-                                        .clickable { onAdjustAudioDelay(-50L) }
-                                        .padding(horizontal = 10.dp, vertical = 4.dp)
-                                ) {
-                                    Text("-50ms", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                }
-                                Text("${videoState.audioDelayMs} ms", color = RefBlueCyanGlow, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                Box(
-                                    modifier = Modifier
-                                        .clip(CircleShape)
-                                        .background(Color(0x40FFFFFF))
-                                        .clickable { onAdjustAudioDelay(50L) }
-                                        .padding(horizontal = 10.dp, vertical = 4.dp)
-                                ) {
-                                    Text("+50ms", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    // SUBTITLES TAB CONTENT (Cloned from Reference b35ecc5e & 1cb5f32d)
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text("Available Subtitles:", color = Color(0xFFA1A1AA), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-
-                        videoState.availableSubtitleTracks.forEachIndexed { index, subName ->
-                            val isSelected = videoState.currentSubtitleTrackIndex == index
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(if (isSelected) Color(0x4000F0FF) else Color(0x20FFFFFF))
-                                    .clickable { onSelectSubtitleTrack(index) }
-                                    .padding(horizontal = 14.dp, vertical = 10.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = subName,
-                                    color = if (isSelected) RefBlueCyanGlow else Color.White,
-                                    fontSize = 13.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                )
-                                if (isSelected) {
-                                    Icon(Icons.Default.Check, contentDescription = null, tint = RefBlueCyanGlow, modifier = Modifier.size(18.dp))
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        // Subtitle Delay Stepper
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("Subtitle Delay:", color = Color.White, fontSize = 13.sp)
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(CircleShape)
-                                        .background(Color(0x40FFFFFF))
-                                        .clickable { onAdjustSubtitleDelay(-100L) }
-                                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                                ) {
-                                    Text("-100ms", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                }
-                                Text("${videoState.subtitleDelayMs} ms", color = RefBlueCyanGlow, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                Box(
-                                    modifier = Modifier
-                                        .clip(CircleShape)
-                                        .background(Color(0x40FFFFFF))
-                                        .clickable { onAdjustSubtitleDelay(100L) }
-                                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                                ) {
-                                    Text("+100ms", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-
-                        // Subtitle Font Size Stepper
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("Font Size: ${subtitleFontSize}sp", color = Color.White, fontSize = 13.sp)
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(CircleShape)
-                                        .background(Color(0x40FFFFFF))
-                                        .clickable { if (subtitleFontSize > 15) subtitleFontSize -= 2 }
-                                        .padding(horizontal = 10.dp, vertical = 4.dp)
-                                ) {
-                                    Text("A-", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                }
-                                Box(
-                                    modifier = Modifier
-                                        .clip(CircleShape)
-                                        .background(Color(0x40FFFFFF))
-                                        .clickable { if (subtitleFontSize < 40) subtitleFontSize += 2 }
-                                        .padding(horizontal = 10.dp, vertical = 4.dp)
-                                ) {
-                                    Text("A+", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Done button
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(Brush.horizontalGradient(listOf(RefBlueCyanGlow, RefPurpleLight)))
-                            .clickable { onDismiss() }
-                            .padding(horizontal = 22.dp, vertical = 10.dp)
-                    ) {
-                        Text("Apply & Close", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
                 }
             }

@@ -418,12 +418,17 @@ fun FullScreenMusicPlayerScreen(
                     .height(24.dp)
                     .pointerInput(Unit) {
                         detectTapGestures { offset ->
-                            val newProgress = (offset.x / size.width).coerceIn(0f, 1f)
-                            onSeek((newProgress * uiState.durationMs).toLong())
+                            val width = size.width
+                            if (width > 0f) {
+                                val newProgress = (offset.x / width).coerceIn(0f, 1f)
+                                onSeek((newProgress * uiState.durationMs).toLong())
+                            }
                         }
                     }
                     .testTag("player_progress_slider")
             ) {
+                if (size.width <= 0f || size.height <= 0f) return@Canvas
+
                 val trackHeight = 3.dp.toPx()
                 val cy = size.height / 2
                 val activeWidth = size.width * progress
@@ -445,7 +450,9 @@ fun FullScreenMusicPlayerScreen(
                 )
 
                 // Thumb handle with glow
-                val thumbX = activeWidth.coerceIn(8.dp.toPx(), size.width - 8.dp.toPx())
+                val minThumbX = 8.dp.toPx()
+                val maxThumbX = (size.width - 8.dp.toPx()).coerceAtLeast(minThumbX)
+                val thumbX = activeWidth.coerceIn(minThumbX, maxThumbX)
                 drawCircle(
                     color = colors.accentGlow.copy(alpha = 0.4f),
                     radius = 9.dp.toPx(),

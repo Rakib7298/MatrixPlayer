@@ -92,19 +92,32 @@ class MatrixVideoEngine(private val context: Context) {
 
     fun prepareAndPlay(uriString: String, title: String) {
         try {
-            val safeUri = if (uriString.isNotBlank() && (uriString.startsWith("content://") || uriString.startsWith("file://") || uriString.startsWith("http://") || uriString.startsWith("https://"))) {
-                uriString
-            } else {
-                // Guaranteed valid test stream fallback
-                "https://storage.googleapis.com/exoplayer-test-media-0/BigBuckBunny_320x180.mp4"
+            val safeUri = when {
+                uriString.isBlank() -> "https://storage.googleapis.com/exoplayer-test-media-0/BigBuckBunny_320x180.mp4"
+                uriString.startsWith("content://") || uriString.startsWith("file://") || uriString.startsWith("http://") || uriString.startsWith("https://") -> uriString
+                uriString.startsWith("/") -> "file://$uriString"
+                else -> uriString
             }
-            val mediaItem = MediaItem.Builder()
+
+            val mediaItemBuilder = MediaItem.Builder()
                 .setUri(safeUri)
-                .setMediaId(if (title.isNotBlank()) title else "demo_video")
-                .build()
+                .setMediaId(if (title.isNotBlank()) title else "matrix_video_${System.currentTimeMillis()}")
+
+            if (safeUri.contains(".m3u8", ignoreCase = true) || safeUri.contains("m3u8", ignoreCase = true) || safeUri.contains("/hls", ignoreCase = true)) {
+                mediaItemBuilder.setMimeType(androidx.media3.common.MimeTypes.APPLICATION_M3U8)
+            } else if (safeUri.contains(".mpd", ignoreCase = true)) {
+                mediaItemBuilder.setMimeType(androidx.media3.common.MimeTypes.APPLICATION_MPD)
+            }
+
+            val mediaItem = mediaItemBuilder.build()
             player.setMediaItem(mediaItem)
             player.prepare()
             player.play()
+
+            _videoState.value = _videoState.value.copy(
+                isPlaying = true,
+                currentPositionMs = 0L
+            )
         } catch (e: Exception) {
             e.printStackTrace()
         }

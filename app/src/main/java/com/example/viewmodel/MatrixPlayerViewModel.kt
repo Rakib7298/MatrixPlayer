@@ -251,10 +251,23 @@ class MatrixPlayerViewModel(application: Application) : AndroidViewModel(applica
         }
     }
 
+    private fun notifyWidgets() {
+        val s = _uiState.value
+        com.example.widget.MatrixMusicWidgetProvider.updateAllWidgets(
+            getApplication(),
+            s.currentTrack?.title,
+            s.currentTrack?.artist,
+            s.isPlaying,
+            s.currentPositionMs,
+            s.durationMs
+        )
+    }
+
     fun togglePlayPause() {
         playbackManager.togglePlayPause()
         val nextPlay = !_uiState.value.isPlaying
         _uiState.value = _uiState.value.copy(isPlaying = nextPlay)
+        notifyWidgets()
         if (nextPlay) {
             _uiState.value.currentTrack?.let { track ->
                 viewModelScope.launch {
@@ -273,6 +286,7 @@ class MatrixPlayerViewModel(application: Application) : AndroidViewModel(applica
             durationMs = track.durationMs,
             isFavorite = track.isFavorite
         )
+        notifyWidgets()
         viewModelScope.launch {
             repository.recordHistory(track.id, 0L)
         }

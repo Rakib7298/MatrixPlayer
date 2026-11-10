@@ -818,12 +818,16 @@ fun EqStudioScreen(
                             .background(Color(0xFF1B1D2A))
                             .pointerInput(Unit) {
                                 detectTapGestures { offset ->
-                                    preampGainVal = (offset.x / size.width).coerceIn(0.05f, 0.95f)
+                                    if (size.width > 0f) {
+                                        preampGainVal = (offset.x / size.width).coerceIn(0.05f, 0.95f)
+                                    }
                                 }
                             }
                             .pointerInput(Unit) {
                                 detectDragGestures { change, _ ->
-                                    preampGainVal = (change.position.x / size.width).coerceIn(0.05f, 0.95f)
+                                    if (size.width > 0f) {
+                                        preampGainVal = (change.position.x / size.width).coerceIn(0.05f, 0.95f)
+                                    }
                                 }
                             },
                         contentAlignment = Alignment.CenterStart

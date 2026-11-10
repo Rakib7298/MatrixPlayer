@@ -84,6 +84,7 @@ fun HomeDashboardScreen(
     videos: List<VideoItem> = emptyList(),
     history: List<TrackItem> = emptyList(),
     stations: List<StreamStation> = emptyList(),
+    reactiveFrame: com.example.media.visualizer.AudioReactiveFrame = com.example.media.visualizer.AudioReactiveFrame(),
     onTrackClick: (TrackItem) -> Unit,
     onVideoClick: ((VideoItem) -> Unit)? = null,
     onOpenLocalFilePicker: () -> Unit = {},
@@ -111,71 +112,82 @@ fun HomeDashboardScreen(
         QuickAction("Link Health", Icons.Default.Sensors, Screen.LinkHealthChecker, Color(0xFF10B981))
     )
 
-    LazyColumn(
+    Column(
         modifier = modifier
             .fillMaxSize()
-            .testTag("home_dashboard_screen"),
-        contentPadding = PaddingValues(bottom = 120.dp)
+            .testTag("home_dashboard_screen")
     ) {
-        // Hero Header
-        item {
-            Column(
+        // Pinned Top Bar: Stays permanently visible with compact spacing and crystal glass effect
+        GlassSurface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding(),
+            shape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp),
+            borderRadius = 20.dp,
+            borderWidth = 1.dp,
+            backgroundOpacity = 0.22f,
+            hasCenteredShadow = true
+        ) {
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .statusBarsPadding()
-                    .padding(horizontal = 16.dp)
-                    .padding(top = 2.dp, bottom = 4.dp)
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = "MATRIX PLAYER",
-                            style = MaterialTheme.typography.displayMedium.copy(
-                                fontWeight = FontWeight.ExtraBold,
-                                letterSpacing = 0.5.sp
-                            ),
-                            color = colors.textPrimary
+                Column {
+                    Text(
+                        text = "MATRIX PLAYER",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = 0.8.sp,
+                            fontSize = 19.sp
+                        ),
+                        color = colors.textPrimary
+                    )
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    IconButton(
+                        onClick = { onNavigate(Screen.AiChat) },
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(CircleShape)
+                            .background(colors.accentGlow)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.AutoAwesome,
+                            contentDescription = "AI Chat",
+                            tint = colors.backgroundDeep,
+                            modifier = Modifier.size(17.dp)
                         )
                     }
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        IconButton(
-                            onClick = { onNavigate(Screen.AiChat) },
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(colors.accentGlow)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.AutoAwesome,
-                                contentDescription = "AI Chat",
-                                tint = colors.backgroundDeep,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-
-                        IconButton(
-                            onClick = { onNavigate(Screen.Settings) },
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(colors.glassCardBackground)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Settings,
-                                contentDescription = "Settings",
-                                tint = colors.textPrimary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
+                    IconButton(
+                        onClick = { onNavigate(Screen.Settings) },
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(CircleShape)
+                            .background(colors.glassCardBackground)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Settings",
+                            tint = colors.textPrimary,
+                            modifier = Modifier.size(17.dp)
+                        )
                     }
                 }
             }
         }
+
+        // Scrollable Content
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            contentPadding = PaddingValues(top = 8.dp, bottom = 120.dp)
+        ) {
 
         // Last Playing Media File Preview Option (Audio, Video, or Streaming Link)
         item {
@@ -380,6 +392,25 @@ fun HomeDashboardScreen(
             }
         }
 
+        // Live Real-Time Liquid Glass Visualizer Studio Card (Powered by Media3 Audio Engine)
+        item {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp)
+            ) {
+                com.example.ui.components.LiquidGlassVisualizerCanvas(
+                    reactiveFrame = reactiveFrame,
+                    isPlaying = uiState.isPlaying,
+                    heightDp = 130.dp,
+                    showControlsHeader = true,
+                    initialType = com.example.ui.components.LiquidVisualizerType.NEON_SPECTRUM,
+                    accentColor = colors.accentGlow,
+                    secondaryColor = Color(0xFFB026FF)
+                )
+            }
+        }
+
         // Recent Discovered Tracks Section
         item {
             Text(
@@ -444,4 +475,5 @@ fun HomeDashboardScreen(
             }
         }
     }
+}
 }
