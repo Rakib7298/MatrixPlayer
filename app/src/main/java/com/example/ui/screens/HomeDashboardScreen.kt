@@ -48,6 +48,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
@@ -55,9 +56,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.media.streaming.StreamStation
 import com.example.model.TrackItem
+import com.example.model.VideoItem
 import com.example.ui.components.CrystalGlassCard
+import com.example.ui.components.GlassSurface
 import com.example.ui.components.GlowingProgressRing
+import com.example.ui.components.LiveStreamingOptionPanel
+import com.example.ui.components.MediaThumbnailView
+import com.example.ui.components.ThumbnailMediaType
+import com.example.ui.components.VideoThumbnailView
 import com.example.ui.navigation.Screen
 import com.example.ui.theme.LocalMatrixColors
 import com.example.viewmodel.PlayerUiState
@@ -73,7 +81,12 @@ data class QuickAction(
 fun HomeDashboardScreen(
     uiState: PlayerUiState,
     tracks: List<TrackItem>,
+    videos: List<VideoItem> = emptyList(),
+    history: List<TrackItem> = emptyList(),
+    stations: List<StreamStation> = emptyList(),
     onTrackClick: (TrackItem) -> Unit,
+    onVideoClick: ((VideoItem) -> Unit)? = null,
+    onOpenLocalFilePicker: () -> Unit = {},
     onNavigate: (Screen) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -110,7 +123,8 @@ fun HomeDashboardScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .statusBarsPadding()
-                    .padding(horizontal = 20.dp, vertical = 12.dp)
+                    .padding(horizontal = 16.dp)
+                    .padding(top = 2.dp, bottom = 4.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -122,38 +136,40 @@ fun HomeDashboardScreen(
                             text = "MATRIX PLAYER",
                             style = MaterialTheme.typography.displayMedium.copy(
                                 fontWeight = FontWeight.ExtraBold,
-                                letterSpacing = 1.sp
+                                letterSpacing = 0.5.sp
                             ),
                             color = colors.textPrimary
                         )
                     }
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         IconButton(
                             onClick = { onNavigate(Screen.AiChat) },
                             modifier = Modifier
-                                .size(42.dp)
+                                .size(36.dp)
                                 .clip(CircleShape)
                                 .background(colors.accentGlow)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.AutoAwesome,
                                 contentDescription = "AI Chat",
-                                tint = colors.backgroundDeep
+                                tint = colors.backgroundDeep,
+                                modifier = Modifier.size(18.dp)
                             )
                         }
 
                         IconButton(
                             onClick = { onNavigate(Screen.Settings) },
                             modifier = Modifier
-                                .size(42.dp)
+                                .size(36.dp)
                                 .clip(CircleShape)
                                 .background(colors.glassCardBackground)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Settings,
                                 contentDescription = "Settings",
-                                tint = colors.textPrimary
+                                tint = colors.textPrimary,
+                                modifier = Modifier.size(18.dp)
                             )
                         }
                     }
@@ -161,139 +177,200 @@ fun HomeDashboardScreen(
             }
         }
 
-        // Now Playing Hero Glass Banner
+        // Last Playing Media File Preview Option (Audio, Video, or Streaming Link)
         item {
-            val currentTrack = uiState.currentTrack ?: tracks.firstOrNull()
-            if (currentTrack != null) {
-                CrystalGlassCard(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 18.dp, vertical = 8.dp)
-                        .clickable { onNavigate(Screen.FullScreenMusicPlayer) },
-                    shape = RoundedCornerShape(28.dp),
-                    backgroundColor = colors.backgroundSurface.copy(alpha = 0.85f),
-                    borderColor = colors.glassBorder,
-                    borderWidth = 1.5.dp,
-                    testTag = "home_now_playing_hero"
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(18.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Glowing album artwork circle
-                        Box(
-                            modifier = Modifier.size(76.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            val progress = if (uiState.durationMs > 0)
-                                (uiState.currentPositionMs.toFloat() / uiState.durationMs).coerceIn(0f, 1f)
-                            else 0f
+            val lastVideo = uiState.currentVideo ?: videos.firstOrNull()
+            val lastTrack = history.firstOrNull() ?: uiState.currentTrack ?: tracks.firstOrNull()
 
-                            GlowingProgressRing(
-                                progress = progress,
-                                modifier = Modifier.size(76.dp),
-                                strokeWidth = 3.dp,
-                                color = colors.accentGlow
-                            )
-                            Box(
-                                modifier = Modifier
-                                    .size(62.dp)
-                                    .clip(CircleShape)
-                                    .background(colors.primaryGradient),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.MusicNote,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(32.dp)
-                                )
+            val isLiveStream = uiState.currentTrack?.album?.contains("Live Stream", ignoreCase = true) == true ||
+                    uiState.currentTrack?.uri?.startsWith("http") == true
+            val isVideoLast = uiState.currentVideo != null && !uiState.isPlaying
+
+            val mediaTypeLabel = when {
+                isVideoLast -> "VIDEO PREVIEW"
+                isLiveStream -> "LIVE STREAM PREVIEW"
+                else -> "LAST PLAYED AUDIO"
+            }
+
+            val mediaTitle = when {
+                isVideoLast -> lastVideo?.title ?: "Video File"
+                isLiveStream -> uiState.currentTrack?.title ?: "Live Broadcast"
+                else -> lastTrack?.title ?: "Midnight Echo"
+            }
+
+            val mediaSubtitle = when {
+                isVideoLast -> "${lastVideo?.resolution ?: "HD"} • Video File"
+                isLiveStream -> uiState.currentTrack?.artist ?: "Streaming Station"
+                else -> "${lastTrack?.artist ?: "Unknown Artist"} • ${lastTrack?.album ?: "Audio Library"}"
+            }
+
+            GlassSurface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
+                    .clickable {
+                        when {
+                            isVideoLast && lastVideo != null -> {
+                                onVideoClick?.invoke(lastVideo) ?: onNavigate(Screen.FullScreenVideoPlayer)
+                            }
+                            else -> {
+                                onNavigate(Screen.FullScreenMusicPlayer)
                             }
                         }
+                    },
+                shape = RoundedCornerShape(22.dp),
+                borderRadius = 22.dp,
+                borderWidth = 1.dp,
+                backgroundOpacity = 0.16f,
+                hasCenteredShadow = true,
+                backdropGlow = colors.accentGlow.copy(alpha = 0.25f)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Preview Visual: Video Thumbnail, Channel Logo, or Album Art
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(RoundedCornerShape(14.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        MediaThumbnailView(
+                            url = if (isVideoLast) lastVideo?.thumbnailUri ?: lastVideo?.uri
+                            else if (isLiveStream) uiState.currentTrack?.albumArtUri
+                            else lastTrack?.albumArtUri,
+                            title = mediaTitle,
+                            modifier = Modifier.fillMaxSize(),
+                            mediaType = if (isVideoLast) ThumbnailMediaType.VIDEO
+                            else if (isLiveStream) ThumbnailMediaType.CHANNEL_STREAM
+                            else ThumbnailMediaType.AUDIO,
+                            showLiveBadge = isLiveStream,
+                            badgeText = if (isLiveStream) "LIVE" else if (isVideoLast) "VIDEO" else null
+                        )
+                    }
 
-                        Spacer(modifier = Modifier.width(16.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
 
-                        Column(modifier = Modifier.weight(1f)) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(5.dp)
+                                    .clip(CircleShape)
+                                    .background(colors.accentGlow)
+                            )
+                            Spacer(modifier = Modifier.width(5.dp))
                             Text(
-                                text = "NOW PLAYING",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                text = mediaTypeLabel,
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 9.sp),
                                 color = colors.accentGlow
                             )
-                            Text(
-                                text = currentTrack.title,
-                                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                                color = colors.textPrimary,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = "${currentTrack.artist} • ${currentTrack.album}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = colors.textSecondary,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
                         }
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = mediaTitle,
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, fontSize = 12.sp),
+                            color = colors.textPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = mediaSubtitle,
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.5.sp),
+                            color = colors.textSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
 
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(CircleShape)
-                                .background(colors.accentGlow),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.PlayArrow,
-                                contentDescription = "Play",
-                                tint = colors.backgroundDeep,
-                                modifier = Modifier.size(28.dp)
-                            )
-                        }
+                    Spacer(modifier = Modifier.width(6.dp))
+
+                    // Round Glass Resume Button with Centered Shadow
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(colors.accentGlow)
+                            .clickable {
+                                when {
+                                    isVideoLast && lastVideo != null -> {
+                                        onVideoClick?.invoke(lastVideo) ?: onNavigate(Screen.FullScreenVideoPlayer)
+                                    }
+                                    else -> {
+                                        if (lastTrack != null) onTrackClick(lastTrack)
+                                        else onNavigate(Screen.FullScreenMusicPlayer)
+                                    }
+                                }
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = "Resume",
+                            tint = colors.backgroundDeep,
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
                 }
             }
+        }
+
+        // Advanced Modern Option Panel for Streaming Live Media from M3U, M3U8, GitHub Repos
+        item {
+            LiveStreamingOptionPanel(
+                stations = stations,
+                onPlayTrack = onTrackClick,
+                onPlayVideo = { video ->
+                    onVideoClick?.invoke(video) ?: onNavigate(Screen.FullScreenVideoPlayer)
+                },
+                onOpenLocalFilePicker = onOpenLocalFilePicker,
+                onNavigateToUniversalImport = { onNavigate(Screen.UniversalStreamImport) },
+                onNavigateToGitHub = { onNavigate(Screen.GitHubPlaylists) },
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+            )
         }
 
         // Quick Features Navigation Horizontal Pill Row
         item {
-            Column(modifier = Modifier.padding(top = 16.dp)) {
+            Column(modifier = Modifier.padding(top = 10.dp)) {
                 Text(
                     text = "STUDIOS & HUBS",
-                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp),
                     color = colors.textSecondary,
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)
+                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 4.dp)
                 )
 
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(quickActions) { action ->
                         CrystalGlassCard(
                             modifier = Modifier
                                 .clickable { onNavigate(action.screen) }
-                                .padding(vertical = 4.dp),
-                            shape = RoundedCornerShape(18.dp),
+                                .padding(vertical = 2.dp),
+                            shape = RoundedCornerShape(14.dp),
                             backgroundColor = action.accentColor.copy(alpha = 0.14f),
                             borderColor = action.accentColor.copy(alpha = 0.35f),
                             testTag = "hub_${action.title.lowercase()}"
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
                                     imageVector = action.icon,
                                     contentDescription = action.title,
                                     tint = action.accentColor,
-                                    modifier = Modifier.size(18.dp)
+                                    modifier = Modifier.size(15.dp)
                                 )
-                                Spacer(modifier = Modifier.width(8.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = action.title,
-                                    style = MaterialTheme.typography.labelLarge,
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
                                     color = colors.textPrimary
                                 )
                             }
@@ -307,9 +384,9 @@ fun HomeDashboardScreen(
         item {
             Text(
                 text = "RECENT TRACKS",
-                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp),
                 color = colors.textSecondary,
-                modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 22.dp, bottom = 8.dp)
+                modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 6.dp)
             )
         }
 
@@ -317,48 +394,40 @@ fun HomeDashboardScreen(
             CrystalGlassCard(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 18.dp, vertical = 5.dp)
+                    .padding(horizontal = 16.dp, vertical = 3.dp)
                     .clickable { onTrackClick(track) },
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(12.dp),
                 backgroundColor = colors.backgroundSurface.copy(alpha = 0.65f),
                 borderColor = if (track.id == uiState.currentTrack?.id) colors.accentGlow else colors.glassBorder,
-                borderWidth = if (track.id == uiState.currentTrack?.id) 1.5.dp else 1.dp,
+                borderWidth = if (track.id == uiState.currentTrack?.id) 1.2.dp else 0.8.dp,
                 testTag = "track_item_${track.id}"
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                        .padding(horizontal = 10.dp, vertical = 7.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(42.dp)
-                            .clip(CircleShape)
-                            .background(colors.primaryGradient),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.MusicNote,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
+                    MediaThumbnailView(
+                        url = track.albumArtUri,
+                        title = track.title,
+                        modifier = Modifier.size(34.dp),
+                        mediaType = ThumbnailMediaType.AUDIO
+                    )
 
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
 
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = track.title,
-                            style = MaterialTheme.typography.titleMedium,
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp),
                             color = colors.textPrimary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = "${track.artist} • ${track.durationMs / 1000 / 60}:${String.format("%02d", (track.durationMs / 1000) % 60)}",
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp),
                             color = colors.textSecondary
                         )
                     }
@@ -368,7 +437,7 @@ fun HomeDashboardScreen(
                             imageVector = Icons.Default.Favorite,
                             contentDescription = "Favorite",
                             tint = Color(0xFFFF2A85),
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(16.dp)
                         )
                     }
                 }

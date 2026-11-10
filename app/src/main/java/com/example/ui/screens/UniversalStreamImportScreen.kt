@@ -82,6 +82,8 @@ import com.example.media.streaming.UniversalStreamImportEngine
 import com.example.model.TrackItem
 import com.example.ui.components.CrystalGlassCard
 import com.example.ui.components.MatrixTopAppBar
+import com.example.ui.components.MediaThumbnailView
+import com.example.ui.components.ThumbnailMediaType
 import com.example.ui.theme.LocalMatrixColors
 import kotlinx.coroutines.launch
 
@@ -648,20 +650,14 @@ fun UniversalStreamImportScreen(
                                 .padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(entry.metadata.streamType.badgeColor).copy(alpha = 0.2f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.PlayArrow,
-                                    contentDescription = null,
-                                    tint = Color(entry.metadata.streamType.badgeColor),
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
+                            MediaThumbnailView(
+                                url = entry.metadata.logoUrl,
+                                title = entry.metadata.title,
+                                modifier = Modifier.size(38.dp),
+                                mediaType = if (entry.metadata.streamType == M3uStreamType.VIDEO_STREAM || entry.metadata.streamType == M3uStreamType.HLS_M3U8) ThumbnailMediaType.VIDEO else ThumbnailMediaType.CHANNEL_STREAM,
+                                showLiveBadge = true,
+                                badgeText = if (entry.metadata.streamType == M3uStreamType.HLS_M3U8) "HLS" else "LIVE"
+                            )
 
                             Spacer(modifier = Modifier.width(10.dp))
 

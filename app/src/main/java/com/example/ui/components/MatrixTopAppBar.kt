@@ -39,15 +39,15 @@ fun MatrixTopAppBar(
         modifier = Modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .height(52.dp),
+            .padding(horizontal = 14.dp, vertical = 2.dp)
+            .height(46.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (onBackClick != null) {
             IconButton(
                 onClick = onBackClick,
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(36.dp)
                     .clip(CircleShape)
                     .testTag("top_bar_back_button")
             ) {

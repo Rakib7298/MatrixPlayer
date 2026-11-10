@@ -102,6 +102,7 @@ import androidx.media3.ui.PlayerView
 import com.example.media.video.MatrixVideoEngine
 import com.example.media.video.VideoAspectRatioMode
 import com.example.model.VideoItem
+import com.example.ui.components.MediaControlPanel
 import com.example.ui.navigation.Screen
 import com.example.ui.theme.RefBlueCyanGlow
 import com.example.ui.theme.RefPurpleLight
@@ -246,6 +247,13 @@ fun FullScreenVideoPlayerScreen(
                     view.player = videoEngine.player
                     view.keepScreenOn = true
                     view.resizeMode = videoState.aspectRatioMode.resizeMode
+                },
+                onRelease = { view ->
+                    try {
+                        view.player = null
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
                 },
                 modifier = Modifier.fillMaxSize()
             )
@@ -863,76 +871,20 @@ fun FullScreenVideoPlayerScreen(
                         }
                     }
 
-                    // CENTER FLOATING CRYSTAL CONTROLS: [-10s] [ Play/Pause ] [+10s]
-                    Row(
-                        modifier = Modifier.align(Alignment.Center),
-                        horizontalArrangement = Arrangement.spacedBy(28.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    // CENTER FLOATING LIQUID GLASS CONTROLS: [-10s] [Prev] [Play/Pause] [Next] [+10s]
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(horizontal = 24.dp)
                     ) {
-                        // Previous Track / Fast Rewind 10s
-                        Box(
-                            modifier = Modifier
-                                .size(50.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xB311141E))
-                                .border(1.dp, Color(0x55FFFFFF), CircleShape)
-                                .clickable { videoEngine.seekRelative(-10000L) },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Replay10,
-                                contentDescription = "Rewind 10s",
-                                tint = Color.White,
-                                modifier = Modifier.size(26.dp)
-                            )
-                        }
-
-                        // Main Glowing Circular Glass Play/Pause Button
-                        Box(
-                            modifier = Modifier
-                                .size(74.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    Brush.radialGradient(
-                                        listOf(Color(0xCC1A1F2E), Color(0xB30B101D))
-                                    )
-                                )
-                                .border(
-                                    1.5.dp,
-                                    Brush.linearGradient(
-                                        listOf(RefBlueCyanGlow, RefPurpleLight, Color(0x80FFFFFF))
-                                    ),
-                                    CircleShape
-                                )
-                                .clickable { videoEngine.togglePlayPause() }
-                                .testTag("video_play_pause_btn"),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = if (videoState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                contentDescription = if (videoState.isPlaying) "Pause" else "Play",
-                                tint = Color.White,
-                                modifier = Modifier.size(42.dp)
-                            )
-                        }
-
-                        // Next Track / Fast Forward 10s
-                        Box(
-                            modifier = Modifier
-                                .size(50.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xB311141E))
-                                .border(1.dp, Color(0x55FFFFFF), CircleShape)
-                                .clickable { videoEngine.seekRelative(10000L) },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.FastForward,
-                                contentDescription = "Forward 10s",
-                                tint = Color.White,
-                                modifier = Modifier.size(26.dp)
-                            )
-                        }
+                        MediaControlPanel(
+                            isPlaying = videoState.isPlaying,
+                            onPlayPause = { videoEngine.togglePlayPause() },
+                            onNext = { videoEngine.seekRelative(10000L) },
+                            onPrevious = { videoEngine.seekRelative(-10000L) },
+                            onSeekRelative = { delta -> videoEngine.seekRelative(delta) },
+                            isVideoMode = true
+                        )
                     }
 
                     // BOTTOM 70% TRANSPARENT SUPER CRYSTAL LIQUID GLASS CONTROL PANEL

@@ -40,7 +40,8 @@ data class StreamStation(
     val isBookmarked: Boolean = false,
     val health: StreamHealth = StreamHealth.ONLINE,
     val latencyMs: Long = 28L,
-    val currentTrack: String = "Live Radio Broadcast"
+    val currentTrack: String = "Live Radio Broadcast",
+    val logoUrl: String? = null
 )
 
 data class StreamTelemetry(
@@ -59,6 +60,18 @@ class StreamingManager(
 ) {
     val presetStations = listOf(
         StreamStation(
+            id = "st_nasa_tv",
+            name = "NASA TV HD — Live Space Feed",
+            description = "Live mission coverage, spacewalks, astronaut interviews and rocket launches.",
+            url = "https://ntv1.akamaized.net/hls/live/2014075/NASA-NTV1-HLS/master.m3u8",
+            genre = "Science / Live HLS",
+            protocol = StreamProtocol.HLS,
+            bitrateKbps = 1080,
+            isBookmarked = true,
+            health = StreamHealth.EXCELLENT,
+            logoUrl = "https://images.nasa.gov/images/nasa_logo.png"
+        ),
+        StreamStation(
             id = "st_synth",
             name = "Nightride FM — Synthwave",
             description = "High octane retrowave, outrun, and retro electro synth beats 24/7.",
@@ -67,7 +80,8 @@ class StreamingManager(
             protocol = StreamProtocol.HTTP_MP3,
             bitrateKbps = 320,
             isBookmarked = true,
-            health = StreamHealth.EXCELLENT
+            health = StreamHealth.EXCELLENT,
+            logoUrl = "https://nightride.fm/static/img/logo.png"
         ),
         StreamStation(
             id = "st_chillsynth",
@@ -78,7 +92,8 @@ class StreamingManager(
             protocol = StreamProtocol.HTTP_MP3,
             bitrateKbps = 320,
             isBookmarked = true,
-            health = StreamHealth.ONLINE
+            health = StreamHealth.ONLINE,
+            logoUrl = "https://nightride.fm/static/img/chillsynth_logo.png"
         ),
         StreamStation(
             id = "st_lofi",
@@ -89,7 +104,8 @@ class StreamingManager(
             protocol = StreamProtocol.AAC_LIVE,
             bitrateKbps = 256,
             isBookmarked = true,
-            health = StreamHealth.ONLINE
+            health = StreamHealth.ONLINE,
+            logoUrl = "https://raw.githubusercontent.com/free-radio-directory/stations/master/logos/lofi.png"
         ),
         StreamStation(
             id = "st_groove",
@@ -100,7 +116,8 @@ class StreamingManager(
             protocol = StreamProtocol.HTTP_MP3,
             bitrateKbps = 128,
             isBookmarked = false,
-            health = StreamHealth.EXCELLENT
+            health = StreamHealth.EXCELLENT,
+            logoUrl = "https://somafm.com/img/groovesalad120.png"
         ),
         StreamStation(
             id = "st_drone",
@@ -111,7 +128,8 @@ class StreamingManager(
             protocol = StreamProtocol.HTTP_MP3,
             bitrateKbps = 128,
             isBookmarked = false,
-            health = StreamHealth.ONLINE
+            health = StreamHealth.ONLINE,
+            logoUrl = "https://somafm.com/img/dronezone120.jpg"
         ),
         StreamStation(
             id = "st_defcon",
@@ -122,7 +140,20 @@ class StreamingManager(
             protocol = StreamProtocol.HTTP_MP3,
             bitrateKbps = 128,
             isBookmarked = true,
-            health = StreamHealth.EXCELLENT
+            health = StreamHealth.EXCELLENT,
+            logoUrl = "https://somafm.com/img/defcon120.png"
+        ),
+        StreamStation(
+            id = "st_euronews",
+            name = "Euronews English Live Broadcast",
+            description = "International news coverage, breaking headlines and live reports in Europe & worldwide.",
+            url = "https://euronews-euronews-world-1-au.samsung.wurl.com/manifest/playlist.m3u8",
+            genre = "News / Global HLS",
+            protocol = StreamProtocol.HLS,
+            bitrateKbps = 720,
+            isBookmarked = false,
+            health = StreamHealth.ONLINE,
+            logoUrl = "https://static.euronews.com/website/images/euronews-logo-main-blue.png"
         ),
         StreamStation(
             id = "st_mux_hls",

@@ -255,6 +255,19 @@ fun M3uPreviewDialog(
                                     )
                                 )
 
+                                Spacer(modifier = Modifier.width(4.dp))
+
+                                MediaThumbnailView(
+                                    url = entry.metadata.logoUrl,
+                                    title = entry.metadata.title,
+                                    modifier = Modifier.size(34.dp),
+                                    mediaType = if (entry.metadata.streamType == com.example.media.m3u.M3uStreamType.VIDEO_STREAM || entry.metadata.streamType == com.example.media.m3u.M3uStreamType.HLS_M3U8) ThumbnailMediaType.VIDEO else ThumbnailMediaType.CHANNEL_STREAM,
+                                    showLiveBadge = true,
+                                    badgeText = if (entry.metadata.streamType == com.example.media.m3u.M3uStreamType.HLS_M3U8) "HLS" else "LIVE"
+                                )
+
+                                Spacer(modifier = Modifier.width(8.dp))
+
                                 Column(modifier = Modifier.weight(1f)) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Text(

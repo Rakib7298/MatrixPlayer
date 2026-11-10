@@ -79,6 +79,8 @@ import com.example.media.streaming.StreamStation
 import com.example.media.streaming.StreamingManager
 import com.example.ui.components.CrystalGlassCard
 import com.example.ui.components.MatrixTopAppBar
+import com.example.ui.components.MediaThumbnailView
+import com.example.ui.components.ThumbnailMediaType
 import com.example.ui.theme.LocalMatrixColors
 import kotlinx.coroutines.launch
 
@@ -591,28 +593,15 @@ fun StreamingSourcesScreen(
                             .padding(14.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Protocol avatar badge
-                        Box(
-                            modifier = Modifier
-                                .size(48.dp)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(
-                                    Brush.linearGradient(
-                                        listOf(
-                                            Color(station.protocol.badgeColor),
-                                            Color(0xFF0F172A)
-                                        )
-                                    )
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = if (station.protocol == StreamProtocol.HLS) Icons.Default.Sensors else Icons.Default.Radio,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
+                        // Channel Logo / Media Thumbnail
+                        MediaThumbnailView(
+                            url = station.logoUrl,
+                            title = station.name,
+                            modifier = Modifier.size(46.dp),
+                            mediaType = if (station.protocol == StreamProtocol.HLS) ThumbnailMediaType.VIDEO else ThumbnailMediaType.CHANNEL_STREAM,
+                            showLiveBadge = true,
+                            badgeText = if (station.protocol == StreamProtocol.HLS) "HLS" else "LIVE"
+                        )
 
                         Spacer(modifier = Modifier.width(14.dp))
 

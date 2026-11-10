@@ -67,7 +67,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.media.visualizer.AudioReactiveFrame
+import com.example.ui.components.GlassFloatingSpacer
+import com.example.ui.components.GlassSurface
 import com.example.ui.components.GlassVisualizerMode
+import com.example.ui.components.MediaControlPanel
 import com.example.ui.components.RealtimeGlassVisualizer
 import com.example.ui.components.RealtimeLyricsView
 import com.example.ui.navigation.Screen
@@ -474,170 +477,87 @@ fun FullScreenMusicPlayerScreen(
             }
         }
 
-        // Circular Floating Controls: [Shuffle] [Prev] (( Play/Pause )) [Next] [Repeat]
-        Row(
+        // Liquid Glass Media Control Panel with Round Blocks & Centered Shadows
+        MediaControlPanel(
+            isPlaying = uiState.isPlaying,
+            onPlayPause = onPlayPause,
+            onNext = onNext,
+            onPrevious = onPrevious,
+            isShuffle = uiState.isShuffle,
+            isRepeatOne = uiState.isRepeatOne,
+            onToggleShuffle = onToggleShuffle,
+            onToggleRepeat = onToggleRepeat
+        )
+
+        // Bottom Refractive Glass Capsule: [Add to Playlist] | [Lyrics]
+        GlassSurface(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Shuffle Button with subtle glass circle
-            Box(
-                modifier = Modifier
-                    .size(46.dp)
-                    .clip(CircleShape)
-                    .background(colors.glassCardBackground)
-                    .clickable(onClick = onToggleShuffle)
-                    .testTag("btn_shuffle"),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Shuffle,
-                    contentDescription = "Shuffle",
-                    tint = if (uiState.isShuffle) colors.secondaryGlow else colors.textMuted,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-
-            // Previous Button
-            Box(
-                modifier = Modifier
-                    .size(50.dp)
-                    .clip(CircleShape)
-                    .background(colors.glassCardBackground)
-                    .clickable(onClick = onPrevious)
-                    .testTag("btn_prev"),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.SkipPrevious,
-                    contentDescription = "Previous",
-                    tint = colors.textPrimary,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-
-            // Big Circular Play/Pause Button with Outer Glowing Ring
-            Box(
-                modifier = Modifier
-                    .size(76.dp)
-                    .clip(CircleShape)
-                    .border(2.dp, colors.accentGlow.copy(alpha = 0.7f), CircleShape)
-                    .background(colors.glassCardBackground)
-                    .clickable(onClick = onPlayPause)
-                    .testTag("btn_play_pause"),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = if (uiState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = if (uiState.isPlaying) "Pause" else "Play",
-                    tint = colors.textPrimary,
-                    modifier = Modifier.size(34.dp)
-                )
-            }
-
-            // Next Button
-            Box(
-                modifier = Modifier
-                    .size(50.dp)
-                    .clip(CircleShape)
-                    .background(colors.glassCardBackground)
-                    .clickable(onClick = onNext)
-                    .testTag("btn_next"),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.SkipNext,
-                    contentDescription = "Next",
-                    tint = colors.textPrimary,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-
-            // Repeat Button
-            Box(
-                modifier = Modifier
-                    .size(46.dp)
-                    .clip(CircleShape)
-                    .background(colors.glassCardBackground)
-                    .clickable(onClick = onToggleRepeat)
-                    .testTag("btn_repeat"),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = if (uiState.isRepeatOne) Icons.Default.RepeatOne else Icons.Default.Repeat,
-                    contentDescription = "Repeat",
-                    tint = if (uiState.isRepeatOne) colors.secondaryGlow else colors.textMuted,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-        }
-
-        // Bottom Pill Buttons: [Add to Playlist] | [Lyrics]
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(22.dp))
-                .background(colors.glassCardBackground)
-                .border(1.dp, colors.glassBorder, RoundedCornerShape(22.dp))
-                .padding(vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
+            shape = RoundedCornerShape(26.dp),
+            borderRadius = 26.dp,
+            borderWidth = 1.1.dp,
+            backgroundOpacity = 0.12f,
+            hasCenteredShadow = true
         ) {
             Row(
                 modifier = Modifier
-                    .weight(1f)
-                    .clickable { onNavigate(Screen.Playlists) }
-                    .padding(vertical = 10.dp),
-                horizontalArrangement = Arrangement.Center,
+                    .fillMaxWidth()
+                    .padding(vertical = 2.dp, horizontal = 4.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.Default.PlaylistAdd,
-                    contentDescription = null,
-                    tint = colors.textMuted,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Add to Playlist",
-                    fontSize = 13.sp,
-                    color = colors.textSecondary
-                )
-            }
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(20.dp))
+                        .clickable { onNavigate(Screen.Playlists) }
+                        .padding(vertical = 10.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PlaylistAdd,
+                        contentDescription = null,
+                        tint = colors.textMuted,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Add to Playlist",
+                        fontSize = 13.sp,
+                        color = colors.textSecondary
+                    )
+                }
 
-            Box(
-                modifier = Modifier
-                    .width(1.dp)
-                    .height(20.dp)
-                    .background(colors.glassBorder)
-            )
+                // Soft Floating Glass Spacer with drop shadow
+                GlassFloatingSpacer(height = 20.dp)
 
-            // Realtime Synchronized Lyrics Pill Button
-            Row(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(if (showLyrics) colors.accentGlow.copy(alpha = 0.18f) else Color.Transparent)
-                    .clickable { showLyrics = !showLyrics }
-                    .padding(vertical = 10.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Subtitles,
-                    contentDescription = "Lyrics",
-                    tint = if (showLyrics) colors.accentGlow else colors.textMuted,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = if (showLyrics) "Hide Lyrics" else "Lyrics",
-                    fontSize = 13.sp,
-                    fontWeight = if (showLyrics) FontWeight.Bold else FontWeight.Medium,
-                    color = if (showLyrics) colors.accentGlow else colors.textSecondary
-                )
+                // Realtime Synchronized Lyrics Pill Button
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(if (showLyrics) colors.accentGlow.copy(alpha = 0.22f) else Color.Transparent)
+                        .clickable { showLyrics = !showLyrics }
+                        .padding(vertical = 10.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Subtitles,
+                        contentDescription = "Lyrics",
+                        tint = if (showLyrics) colors.accentGlow else colors.textMuted,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (showLyrics) "Hide Lyrics" else "Lyrics",
+                        fontSize = 13.sp,
+                        fontWeight = if (showLyrics) FontWeight.Bold else FontWeight.Medium,
+                        color = if (showLyrics) colors.accentGlow else colors.textSecondary
+                    )
+                }
             }
         }
     }

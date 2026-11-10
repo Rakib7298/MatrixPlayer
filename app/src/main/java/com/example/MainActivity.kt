@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -23,6 +24,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ui.components.FloatingPlaybackBar
 import com.example.ui.components.MatrixBackground
@@ -132,6 +135,7 @@ fun MatrixAppContent(
     val videos by viewModel.roomVideos.collectAsStateWithLifecycle()
     val favorites by viewModel.roomFavorites.collectAsStateWithLifecycle()
     val history by viewModel.roomHistory.collectAsStateWithLifecycle()
+    val stations by viewModel.streamingManager.stations.collectAsStateWithLifecycle()
 
     // Navigation BackStack state
     val screenStack = remember { mutableStateListOf<Screen>(Screen.Splash) }
@@ -146,16 +150,36 @@ fun MatrixAppContent(
         }
     }
 
+    val context = LocalContext.current
+    var backPressedTime by remember { mutableLongStateOf(0L) }
+
     fun popBack() {
-        if (screenStack.size > 1) {
-            screenStack.removeAt(screenStack.size - 1)
+        try {
+            if (screenStack.size > 1) {
+                screenStack.removeAt(screenStack.size - 1)
+            } else if (screenStack.firstOrNull() != Screen.Home) {
+                screenStack.clear()
+                screenStack.add(Screen.Home)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Error popping back: ${e.message}", e)
+            screenStack.clear()
+            screenStack.add(Screen.Home)
         }
     }
 
-    // Handle system back button for all secondary screens
-    if (screenStack.size > 1) {
-        BackHandler {
+    // Crash-proof BackHandler preventing unhandled system back crashes
+    BackHandler(enabled = true) {
+        if (currentScreen != Screen.Home || screenStack.size > 1) {
             popBack()
+        } else {
+            val now = System.currentTimeMillis()
+            if (now - backPressedTime < 2000L) {
+                (context as? android.app.Activity)?.finish()
+            } else {
+                backPressedTime = now
+                android.widget.Toast.makeText(context, "Press back again to exit", android.widget.Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
@@ -166,6 +190,7 @@ fun MatrixAppContent(
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = Color.Transparent,
+            contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
             bottomBar = {
                 if (!isSplash && !isFullScreenPlayback) {
                     androidx.compose.foundation.layout.Column {
@@ -207,7 +232,7 @@ fun MatrixAppContent(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(if (isFullScreenPlayback || isSplash) androidx.compose.foundation.layout.PaddingValues() else innerPadding)
+                    .padding(bottom = if (isFullScreenPlayback || isSplash) 0.dp else innerPadding.calculateBottomPadding())
             ) {
                 AnimatedContent(
                     targetState = currentScreen,
@@ -225,9 +250,17 @@ fun MatrixAppContent(
                         Screen.Home -> HomeDashboardScreen(
                             uiState = uiState,
                             tracks = tracks,
+                            videos = videos,
+                            history = history,
+                            stations = stations,
                             onTrackClick = { track ->
                                 viewModel.playTrack(track)
                             },
+                            onVideoClick = { video ->
+                                viewModel.playVideo(video)
+                                navigateTo(Screen.FullScreenVideoPlayer)
+                            },
+                            onOpenLocalFilePicker = onLaunchFilePicker,
                             onNavigate = { s -> navigateTo(s) }
                         )
 
